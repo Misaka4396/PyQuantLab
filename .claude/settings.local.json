@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(pip install *)",
+      "Bash(ls /c/Python*)",
+      "Read(//c/Users/**)",
+      "Bash(\"/c/Users/misaka/AppData/Local/Programs/Python/Python312/python.exe\" -m pip install streamlit pandas numpy plotly yfinance scipy)",
+      "Bash(\"/c/Users/misaka/AppData/Local/Programs/Python/Python312/python.exe\" --version)",
+      "Bash(\"/c/Users/misaka/AppData/Local/Programs/Python/Python312/python.exe\" -c \"import streamlit; print\\('streamlit:', streamlit.__version__\\)\")",
+      "Bash(/c/Users/misaka/AppData/Local/Microsoft/WindowsApps/python3 *)",
+      "Bash(export PATH=\"/c/Users/misaka/AppData/Local/Programs/Python/Python312:/c/Users/misaka/AppData/Local/Programs/Python/Python312/Scripts:$PATH\")",
+      "Bash(export PATH=\"/c/Users/misaka/AppData/Local/Programs/Python/Python37:/c/Users/misaka/AppData/Local/Programs/Python/Python37/Scripts:$PATH\")",
+      "Bash(/c/Users/misaka/AppData/Local/Programs/Python/Python312/python.exe *)",
+      "Bash(echo 'home = C:\\\\Users\\\\misaka\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312 *)",
+      "Bash(\"/c/Users/misaka/AppData/Local/Programs/Python/Python312/python.exe\" -c \"print\\('hello'\\)\")",
+      "Bash(where python *)",
+      "Bash(where python3 *)",
+      "Bash(where conda *)",
+      "Read(//c/ProgramData/miniconda3/**)",
+      "Bash(/c/Users/misaka/AppData/Local/Programs/Python/Python37/python.exe -m pip --version)",
+      "Bash(/e/anaconda2/python.exe --version)",
+      "Read(//e/anaconda3/**)",
+      "Bash(python -m pip install --upgrade pip)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"from streamlit.web.bootstrap import run; print\\('bootstrap API available'\\)\")",
+      "Bash(pyinstaller PyQuantLab.spec --noconfirm)",
+      "Bash(timeout 8 \"E:\\\\lianghua1\\\\dist\\\\PyQuantLab\\\\PyQuantLab.exe\")",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(timeout 10 \"E:\\\\lianghua1\\\\dist\\\\PyQuantLab\\\\PyQuantLab.exe\")",
+      "Bash(timeout 12 \"E:\\\\lianghua1\\\\dist\\\\PyQuantLab\\\\PyQuantLab.exe\")",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(timeout 15 \"E:\\\\lianghua1\\\\dist\\\\PyQuantLab\\\\PyQuantLab.exe\")",
+      "Bash(python -c \"from streamlit.web.bootstrap import run; import inspect; print\\(inspect.signature\\(run\\)\\)\")",
+      "Bash(python -c \"import streamlit.version as sv; print\\([x for x in dir\\(sv\\) if not x.startswith\\('__'\\)]\\)\")",
+      "Bash(rm -rf build dist)",
+      "Bash(pyinstaller PyQuantLab_Qt.spec --noconfirm)",
+      "Bash(export QT_QPA_PLATFORM=offscreen)",
+      "Bash(export PATH=\"/c/Users/misaka/AppData/Local/Programs/Python/Python37:$PATH\")",
+      "Bash(python -m PyInstaller PyQuantLab_Qt.spec --noconfirm)"
+    ]
+  }
+}
