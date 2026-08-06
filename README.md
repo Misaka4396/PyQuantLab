@@ -1,82 +1,84 @@
-# PyQuantLab
+# PyQuantLab — Python 量化交易平台
 
-A Python quantitative trading platform with a native desktop GUI, covering the full quant workflow: live market data, strategy development, backtesting, risk analysis, and portfolio optimization.
+[![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![UI: PyQt5](https://img.shields.io/badge/UI-PyQt5-orange.svg)]()
+[![UI: Streamlit](https://img.shields.io/badge/UI-Streamlit-red.svg)]()
 
-## Features
+一站式 **Python 量化交易平台**：覆盖从行情数据、策略研发、向量化回测、风险分析到组合优化的完整量化工作流。
+提供 **PyQt5 原生桌面 GUI** 与 **Streamlit Web UI** 双界面，无需浏览器即可完成全部研究流程。
 
-- **Live Market Data** — Real-time quotes and intraday charts with auto-refresh
-- **Native Desktop GUI** — PyQt5-based application, no browser required
-- **Data Management** — Download historical stock data via yfinance, with local Parquet caching
-- **Strategy Engine** — 4 built-in strategies: MA Crossover, RSI, MACD, Bollinger Bands
-- **Plugin Architecture** — Add new strategies by implementing a base class and registering it
-- **Vectorized Backtesting** — Fast backtesting engine with commission and slippage modeling
-- **Performance Metrics** — Sharpe, Sortino, Calmar ratios, max drawdown, VaR/CVaR, alpha/beta
-- **Risk Analysis** — Drawdown analysis, rolling metrics, stress testing, tail risk
-- **Portfolio Optimization** — Mean-variance (max Sharpe, min variance), risk parity, equal weight
-- **Monte Carlo Simulation** — Forward portfolio simulation with Cholesky decomposition
+> ⚠️ 本项目仅供量化研究与教育学习使用，不构成任何投资建议。
 
-## Installation
+---
 
-### Option 1: Run from Source
+## 目录
+
+- [功能特性](#功能特性)
+- [快速开始](#快速开始)
+- [使用指南](#使用指南)
+- [扩展新策略](#扩展新策略)
+- [项目结构](#项目结构)
+- [修改日志](#修改日志)
+- [License](#license)
+
+---
+
+## 功能特性
+
+| 特性 | 说明 |
+|------|------|
+| 📡 实时行情 | 实时报价 + 分时图自动刷新（60s 轮询，间隔可配） |
+| 🖥️ 原生桌面 GUI | PyQt5 实现，无需浏览器 |
+| 🗄️ 数据管理 | yfinance 下载历史数据，本地 Parquet 缓存 |
+| 🧠 策略引擎 | 内置 4 策略：均线交叉 / RSI / MACD / 布林带 |
+| 🧩 插件架构 | 实现基类 + 注册即可添加新策略，UI 自动生成参数控件 |
+| ⚡ 向量化回测 | 佣金 + 滑点建模，单策略/多策略对比 |
+| 📊 绩效指标 | Sharpe / Sortino / Calmar / 最大回撤 / VaR-CVaR / alpha-beta |
+| 🛡️ 风险分析 | 回撤分析、滚动指标、压力测试、尾部风险 |
+| 🏦 组合优化 | 均值-方差（最大 Sharpe / 最小方差）、风险平价、等权 |
+| 🎲 蒙特卡洛模拟 | Cholesky 分解前瞻组合模拟 |
+
+## 快速开始
+
+### 方式一：源码运行（桌面 GUI）
 
 ```bash
-git clone https://github.com/yourusername/PyQuantLab.git
+git clone https://github.com/Misaka4396/PyQuantLab.git
 cd PyQuantLab
 pip install -r requirements.txt
 python launcher_qt.py
 ```
 
-### Option 2: Standalone EXE (no Python required)
+### 方式二：Web UI（Streamlit）
+
+```bash
+streamlit run app.py
+# 浏览器打开 http://localhost:8501
+```
+
+### 方式三：独立 EXE（免 Python）
 
 ```bash
 pip install pyinstaller
 pyinstaller PyQuantLab_Qt.spec --noconfirm
-# EXE located at: dist/PyQuantLab/PyQuantLab.exe
+# 产物: dist/PyQuantLab/PyQuantLab.exe
 ```
 
-Double-click `dist/PyQuantLab/PyQuantLab.exe` to launch.
+## 使用指南
 
-### Option 3: Web UI (Streamlit)
+| 步骤 | 操作 |
+|------|------|
+| 1. 实时行情 | 输入代码监视实时价格，切换自动刷新与分时图周期 |
+| 2. 数据管理 | 输入代码 + 日期范围下载历史数据，本地 Parquet 缓存 |
+| 3. 策略配置 | 选择策略调整参数，买卖信号实时预览在价格图上 |
+| 4. 运行回测 | 设置资金/佣金/滑点，单策略或全策略横向对比 |
+| 5. 结果与风险 | 六大分析页：概览 / 权益曲线 / 回撤 / 交易分析 / 风险指标 / 压力测试 |
+| 6. 组合模拟 | 优化权重（最大 Sharpe/最小方差/风险平价）+ 蒙特卡洛交互图表 |
 
-```bash
-streamlit run app.py
-# Open http://localhost:8501 in browser
-```
+## 扩展新策略
 
-## Requirements
-
-```
-PyQt5>=5.15
-matplotlib>=3.5
-pandas>=1.3
-numpy>=1.21
-yfinance>=0.1.70
-scipy>=1.7
-```
-
-## Usage Guide
-
-### 1. Live Market
-Enter ticker symbols to monitor real-time prices. Toggle auto-refresh to poll every 60 seconds. View intraday charts with configurable intervals.
-
-### 2. Data Management
-Enter ticker symbols and date range, then click "Load Data" to download historical data. Data is cached locally as Parquet files.
-
-### 3. Strategy Config
-Select a strategy and adjust parameters. Buy/sell signals are previewed on the price chart in real-time.
-
-### 4. Run Backtest
-Set capital, commission, and slippage. Run a single strategy or compare all strategies side-by-side.
-
-### 5. Results & Risk
-Six analysis tabs: Overview, Equity Curve, Drawdown, Trade Analysis, Risk Metrics with stress testing.
-
-### 6. Portfolio Simulator
-Optimize portfolio weights (max Sharpe / min variance / risk parity) and run Monte Carlo simulations with interactive charts.
-
-## Adding a New Strategy
-
-1. Create `strategy/my_strategy.py` implementing `BaseStrategy`:
+1. 创建 `strategy/my_strategy.py`，实现 `BaseStrategy`：
 
 ```python
 from strategy.base import BaseStrategy
@@ -88,56 +90,53 @@ class MyStrategy(BaseStrategy):
         return "My Strategy"
 
     @classmethod
-    def get_description(cls) -> str:
-        return "Strategy description."
-
-    @classmethod
     def get_param_spec(cls) -> dict:
-        return {
-            "param1": {
-                "type": "int", "default": 10, "min": 1, "max": 100, "step": 1,
-                "label": "Parameter 1", "help": "Description",
-            },
-        }
+        return {"param1": {"type": "int", "default": 10, "min": 1, "max": 100,
+                           "step": 1, "label": "参数1", "help": "说明"}}
 
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
-        # Return: 1 (BUY), -1 (SELL), 0 (HOLD) per time step
+        # 返回: 1(买) / -1(卖) / 0(持有)
         pass
 ```
 
-2. Register in `strategy/registry.py`:
+2. 在 `strategy/registry.py` 注册：
+
 ```python
 from strategy.my_strategy import MyStrategy
 registry.register(MyStrategy)
 ```
 
-The strategy automatically appears in the UI dropdown with auto-generated parameter controls.
+新策略自动出现在 UI 下拉框中，参数控件自动生成。
 
-## Project Structure
+## 项目结构
 
 ```
 PyQuantLab/
-├── launcher_qt.py       # Desktop app entry point
-├── launcher.py          # Streamlit web entry point
-├── app.py               # Streamlit app
-├── config.py            # Global configuration
+├── launcher_qt.py       # 桌面应用入口 (PyQt5)
+├── launcher.py          # Streamlit Web 入口
+├── app.py               # Streamlit 应用
+├── config.py            # 全局配置
 ├── data/
-│   ├── live_data.py     # Real-time data fetcher
-│   ├── downloader.py    # yfinance wrapper
-│   ├── cache.py         # Parquet cache
-│   ├── manager.py       # Data orchestration
-│   └── transform.py     # Technical indicators
-├── strategy/            # Strategy base + 4 built-in strategies
-├── backtest/            # Vectorized engine + metrics + risk
-├── portfolio/           # Portfolio optimization + Monte Carlo
+│   ├── live_data.py     # 实时行情
+│   ├── downloader.py    # yfinance 封装
+│   ├── cache.py         # Parquet 缓存
+│   ├── manager.py       # 数据编排
+│   └── transform.py     # 技术指标
+├── strategy/            # 策略基类 + 4 内置策略
+├── backtest/            # 向量化回测 + 指标 + 风险
+├── portfolio/           # 组合优化 + 蒙特卡洛
 └── ui/
-    ├── main_window.py   # PyQt5 main window
-    ├── charts_qt.py     # Matplotlib chart factories
-    ├── pages_qt/        # 6 PyQt5 page widgets
-    ├── pages/           # 5 Streamlit pages (web UI)
-    └── components/      # Streamlit chart components
+    ├── main_window.py   # PyQt5 主窗口
+    ├── charts_qt.py     # Matplotlib 图表工厂
+    ├── pages_qt/        # 6 个 PyQt5 页面组件
+    ├── pages/           # 5 个 Streamlit 页面
+    └── components/      # Streamlit 图表组件
 ```
+
+## 修改日志
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — 详见 [LICENSE](LICENSE)

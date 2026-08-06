@@ -37,7 +37,15 @@
       "Bash(pyinstaller PyQuantLab_Qt.spec --noconfirm)",
       "Bash(export QT_QPA_PLATFORM=offscreen)",
       "Bash(export PATH=\"/c/Users/misaka/AppData/Local/Programs/Python/Python37:$PATH\")",
-      "Bash(python -m PyInstaller PyQuantLab_Qt.spec --noconfirm)"
+      "Bash(python -m PyInstaller PyQuantLab_Qt.spec --noconfirm)",
+      "Bash(git lfs *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git config *)",
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "Bash(git remote *)"
     ]
   }
 }
