@@ -1,0 +1,85 @@
+# 批次 5 任务：B4 — ETF 套利回测集成与评估 + C3 — 模型训练、重训调度与集成
+
+## 项目上下文
+你在 E:\lianghua1（PyQuantLab）工作。已完成模块：
+- A1 数据层、A2 事件驱动引擎（engine/）、A3 成本模型（cost_model.py）、A4 绩效评估（backtest/metrics_enhanced.py、backtest/report.py）
+- B1 ETF 套利数据层（etf/etf_data.py、etf/pcf_parser.py、etf/iopv_estimator.py）
+- B2 折溢价信号（etf/etf_signal.py、etf/threshold_config.py、etf/signal_grid.py）
+- B3 篮子同步执行（etf/basket_execution.py、etf/execution_config.py）
+- C1 特征工程（ml/features.py）、C2 训练/验证框架（ml/cv.py、ml/walk_forward.py）
+
+先阅读相关文件了解接口。CLAUDE.md 含环境与规范。主 Python 环境：E:\Anaconda3-2026\python.exe（torch CPU、lightgbm、scikit-learn 已装）。
+
+本批次交付两个模块：**B4 ETF 套利回测集成与评估**（B 专项收口）、**C3 模型训练、重训调度与集成**（C 专项核心，含 PyTorch 深度学习扩展）。
+
+## B4 任务正文
+Role：量化策略研究员
+
+Context：把 B1/B2/B3 接入 A2，跑完整回测，评估扣成本收益、容量、风险。
+
+Task：集成与评估：
+1. ETF 套利策略挂载到 A2 引擎（engine/，通过回调/插件机制挂载 B2 信号与 B3 执行）
+2. 多年分钟级回测，输出扣成本收益
+3. 容量分析：按成交额占比评估容量
+4. 压力测试：涨跌停潮、停牌、极端折溢价下最大敞口
+5. 与 A4 联动出报告（backtest/report.py）
+
+Constraints：分"理想执行"与"含同步风险"两套对比，凸显执行风险影响。
+
+Input：A2 引擎、B2 信号、B3 执行、A4 评估
+
+Output Format：
+- etf/etf_backtest.py —— 集成主脚本（套利策略挂载 A2、双模式对比、容量分析、压力测试、A4 报告联动）
+- etf/etf_strategy.py —— ETF 套利策略类（消费 B2 信号流、生成 A2 订单、挂载 B3 执行）
+- tests/test_etf_backtest.py —— 集成测试（合成数据跑通：理想 vs 含同步风险两条权益曲线可对比）
+
+Acceptance Criteria：
+- 理想 vs 真实执行对比清晰（测试断言两条权益曲线存在且不同）
+- 扣成本收益可复现（固定种子）
+- 有容量与压力测试结论（输出容量上限估算与压力测试最大敞口）
+- 报告含折溢价机会频率/幅度统计
+
+## C3 任务正文
+Role：机器学习工程师
+
+Context：训练 LightGBM 基线，支持 LSTM/Transformer/RL 扩展，可复现、可重训、版本化。
+
+Task：实现训练层：
+1. LightGBM/XGBoost 基线：方向分类/收益回归，超参搜索在 C2 框架内（ml/cv.py 的 Purged CV）
+2. 深度学习扩展：LSTM/Transformer（PyTorch），严格时序切分（用 C2 walk_forward 切分，PyTorch Dataset 按时间窗口构建，禁止 shuffle 跨时间）
+3. RL 扩展：做市/交易策略（stable-baselines3，可选开关，本批次只留接口与开关，不强制实现训练）
+4. 重训调度：按周期自动重训，模型版本化
+5. 可复现：固定种子、记录特征/超参/数据版本
+
+Constraints：先 LightGBM 基线，DL/RL 为可选开关；模型与数据版本绑定。
+
+Input：C1 特征层、C2 验证框架
+
+Output Format：
+- ml/train.py —— 训练入口（LightGBM 基线 + DL 开关，参数化）
+- ml/models_lgb.py —— LightGBM 基线（方向分类/收益回归）
+- ml/models_torch.py —— PyTorch 模型（LSTM/Transformer，严格时序切分训练循环，CPU 可跑）
+- ml/torch_dataset.py —— PyTorch Dataset（时间窗口构建，禁止跨时间 shuffle）
+- ml/model_registry.py —— 模型注册/版本管理（模型与数据/特征/超参版本绑定，可回滚）
+- ml/retrain_scheduler.py —— 重训调度（按周期触发重训，输出调度日志）
+- ml/run_config.py —— 训练配置（种子/周期/模型开关/数据版本）
+- tests/test_train.py —— 单元测试（合成数据上 LightGBM 训练可复现；torch_dataset 时序切分正确、LSTM 前向可跑）
+
+Acceptance Criteria：
+- LightGBM 基线可复现（同种子同数据两次训练指标一致）
+- 模型可回滚（registry 支持加载历史版本）
+- 重训自动触发（scheduler 逻辑测试）
+- DL/RL 为开关（config 关闭时训练只跑 LightGBM）
+
+## 交付要求
+1. 文件落在 E:\lianghua1 对应路径
+2. 必须实际运行测试并全部通过：E:\Anaconda3-2026\python.exe -m pytest tests/test_etf_backtest.py tests/test_train.py -v
+3. PyTorch 用 CPU 训练（本机无 GPU），模型规模适中，测试不得超时（单测 < 60s）
+4. 中文注释、类型提示
+
+## 最终报告（用中文，控制在 250 行内）
+- 交付文件清单（含路径）
+- 每个文件的职责一句话
+- 单元测试结果（通过数/总数）
+- B4 双模式对比实现要点；C3 模型版本管理与重训调度要点；PyTorch 时序切分要点
+- 遇到的问题与处理方式

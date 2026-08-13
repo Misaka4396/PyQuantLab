@@ -38,6 +38,13 @@
 | 🛡️ 风险分析 | 回撤分析、滚动指标、压力测试、尾部风险 |
 | 🏦 组合优化 | 均值-方差（最大 Sharpe / 最小方差）、风险平价、等权 |
 | 🎲 蒙特卡洛模拟 | Cholesky 分解前瞻组合模拟 |
+| 🗄️ 回测数据治理 | point-in-time 数据层（as_of 时间戳防前视）、幸存者偏差处理、数据质量报告 |
+| ⚙️ 事件驱动引擎 | engine/ 事件循环（信号→订单→撮合→核算），多标的、插件回调、可复现 |
+| 💰 成本与滑点 | 佣金/印花税/过户费/半价差/冲击成本/篮子加成，逐笔明细可审计 |
+| 📈 绩效评估增强 | Sharpe/Sortino/Calmar/VaR-CVaR + 月度热力图 + HTML 报告 + trade 导出 |
+| 🔄 ETF 套利 | IOPV/NAV/PCF 数据层、折溢价信号与阈值、篮子同步执行、申赎模拟、套利回测 |
+| 🧠 ML/DL 建模 | 防泄漏特征流水线、Purged CV + Walk-forward、LightGBM 基线 + PyTorch LSTM/Transformer |
+| 🛡️ 过拟合检测 | Deflated Sharpe / PBO / CSCV 过拟合评估与上线建议 |
 
 ## 快速开始
 
@@ -116,15 +123,16 @@ PyQuantLab/
 ├── launcher.py          # Streamlit Web 入口
 ├── app.py               # Streamlit 应用
 ├── config.py            # 全局配置
-├── data/
-│   ├── live_data.py     # 实时行情
-│   ├── downloader.py    # yfinance 封装
-│   ├── cache.py         # Parquet 缓存
-│   ├── manager.py       # 数据编排
-│   └── transform.py     # 技术指标
+├── cost_model.py        # 交易成本与滑点模型（A3）
+├── cost_config.py       # 成本参数集中配置
+├── data/                # 行情/缓存/编排 + A1 数据治理（pit/survivorship/data_loader/quality_report/schemas）
 ├── strategy/            # 策略基类 + 4 内置策略
-├── backtest/            # 向量化回测 + 指标 + 风险
+├── engine/              # A2 事件驱动回测引擎（events/order/matching/portfolio/accounting）
+├── backtest/            # 向量化回测 + 绩效指标 + A4 报告（metrics_enhanced/report）
 ├── portfolio/           # 组合优化 + 蒙特卡洛
+├── etf/                 # B ETF 套利专项（数据层/信号/篮子执行/回测集成）
+├── ml/                  # C ML/DL 专项（特征/CV/训练/过拟合检测）
+├── core/                # 核心类型与异常
 └── ui/
     ├── main_window.py   # PyQt5 主窗口
     ├── charts_qt.py     # Matplotlib 图表工厂
@@ -132,6 +140,17 @@ PyQuantLab/
     ├── pages/           # 5 个 Streamlit 页面
     └── components/      # Streamlit 图表组件
 ```
+
+### 量化研究增强层（v1.2.0 新增）
+
+| 专项 | 模块 | 说明 |
+|------|------|------|
+| A 通用底座 | `data/pit.py` 等 | point-in-time 数据治理，杜绝未来函数与幸存者偏差 |
+| A 通用底座 | `engine/` | 事件驱动回测引擎，为 ETF 篮子下单与 ML 滚动重训预留扩展点 |
+| A 通用底座 | `cost_model.py` | 佣金/印花税/过户费/价差/冲击/篮子成本，逐笔明细可审计 |
+| A 通用底座 | `backtest/metrics_enhanced.py` | 完整绩效指标 + 一键 HTML/PNG 报告 |
+| B ETF 套利 | `etf/` | IOPV/NAV/PCF 对齐、折溢价信号、篮子同步执行、套利回测（理想 vs 真实执行双模式） |
+| C ML/DL | `ml/` | 防泄漏特征、Purged CV + Walk-forward、LightGBM/PyTorch 训练、过拟合检测（DSR/PBO/CSCV） |
 
 ## 修改日志
 

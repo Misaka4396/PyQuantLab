@@ -29,5 +29,9 @@ class BacktestError(PyQuantLabError):
     """Backtest execution failures."""
 
 
+class EngineError(PyQuantLabError):
+    """Event-driven backtest engine failures."""
+
+
 class PortfolioError(PyQuantLabError):
     """Optimization convergence failures."""

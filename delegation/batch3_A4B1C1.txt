@@ -1,0 +1,108 @@
+# 批次 3 任务：A4 — 绩效评估与报告 + B1 — ETF 套利数据层 + C1 — 特征工程与标注
+
+## 项目上下文
+你在 E:\lianghua1（PyQuantLab）工作。已完成的模块：
+- A1 数据层：data/data_loader.py、data/pit.py、data/survivorship.py、data/quality_report.py、data/schemas.md
+- A2 事件驱动引擎：engine/（events.py/order.py/matching.py/portfolio.py/accounting.py/engine.py/config.py）
+- A3 成本模型：cost_model.py、cost_config.py
+
+先阅读上述文件了解接口。CLAUDE.md 含环境与规范。主 Python 环境：E:\Anaconda3-2026\python.exe。
+
+本批次交付三个模块：**A4 绩效评估与报告**（通用底座，供 B4/C4 联动）、**B1 ETF 套利数据层**（B 专项起点）、**C1 特征工程与标注流水线**（C 专项起点）。
+
+## A4 任务正文
+Role：量化研究员 / 绩效分析师
+
+Context：标准绩效与风险指标 + 可视化报告，用于对比策略与过拟合判断（与 C4 联动）。
+
+Task：实现评估层：
+1. 收益：累计、年化、月度/年度
+2. 风险：波动率、最大回撤、Sharpe、Sortino、Calmar、VaR/CVaR
+3. 交易：胜率、盈亏比、换手、持仓周期、成本占比
+4. 归因：按策略/信号分组（可选）
+5. 报告：权益曲线、回撤、月度热力图、trade list 导出
+
+Constraints：指标公式注明定义；与 C4 过拟合指标预留接口（如输入 OOS/IS 两组权益序列即可对比）。
+
+Input：A2 引擎输出（engine/portfolio.py 的权益曲线与成交记录）
+
+Output Format：
+- backtest/metrics_enhanced.py —— 完整指标层（收益/风险/交易/成本占比；公式注释）
+- backtest/report.py —— 报告生成（matplotlib 权益曲线/回撤/月度热力图 + trade list CSV 导出；支持保存 HTML/PNG）
+- backtest/report_templates/ —— 报告模板（README 说明使用方式）
+- tests/test_metrics_enhanced.py —— 单元测试（指标与已知数据手算一致）
+
+Acceptance Criteria：
+- 指标与已知数据手算一致（测试含手算对照，如简单收益率序列的 Sharpe/最大回撤）
+- 一键生成报告：输入权益曲线+交易记录 → 输出 PNG/HTML + trade CSV
+- 报告含权益/回撤/月度热力图/成本占比
+
+## B1 任务正文
+Role：量化数据工程师
+
+Context：ETF 套利需 ETF 价 + 盘中 IOPV + 收盘 NAV + 篮子 PCF + 成分股行情，对齐是难点。
+
+Task：实现 ETF 套利数据：
+1. ETF 分钟行情（含 IOPV，交易所每 15s 发布；akshare 取数，失败则定义标准接口 + 合成演示数据）
+2. 篮子 PCF：每只成分股权重/股数、现金差额、最小申赎单位（定义 PCF 文件解析接口，兼容基金公司公开 PCF 格式；akshare 取数失败用标准格式示例文件演示）
+3. NAV 历史与 IOPV 对齐
+4. 折溢价：盘中 (ETF价-IOPV)/IOPV，收盘 (ETF价-NAV)/NAV
+5. 停牌/涨跌停成分股标记（篮子不可交易部分）
+
+Constraints：PCF 处理更新频率与 T/次日生效；IOPV 缺失时用成分股实时合成估算。
+
+Input：A1 数据层
+
+Output Format：
+- etf/etf_data.py —— ETF 套利数据主模块（行情/IOPV/NAV/PCF 对齐、折溢价序列）
+- etf/pcf_parser.py —— PCF 篮子文件解析（标准接口 + 示例文件）
+- etf/iopv_estimator.py —— IOPV 缺失时的成分股合成估算
+- etf/demo_data/ —— 演示数据（PCF 示例、折溢价示例序列）
+- tests/test_etf_data.py —— 单元测试
+
+Acceptance Criteria：
+- 折溢价与公开数据抽样一致（合成数据可校验）
+- 篮子权重之和=1（±0.5% 容差，测试断言）
+- 能识别停牌成分股
+- PCF 生效日不串期（T 日 PCF 次日生效测试）
+
+## C1 任务正文
+Role：机器学习工程师（量化方向）
+
+Context：ML 最大坑是数据泄漏与未来函数。需严格 point-in-time 特征与标注流水线。
+
+Task：实现特征/标注层：
+1. 标注：未来收益、方向、波动率（label 与特征严格对齐 t→t+h）
+2. 特征：动量/波动/成交量/均线、微观结构
+3. 防泄漏：特征只用 t 及之前数据；滚动标准化在样本内计算
+4. 缺失处理、异常值、类别编码
+5. 特征存储（parquet + 版本化）
+
+Constraints：每特征标注"可用时点"；禁全样本标准化；label 构造可追溯；数据集版本化。
+
+Input：A1 数据层
+
+Output Format：
+- ml/features.py —— 特征/标注流水线（特征生成、label 对齐、滚动标准化）
+- ml/features_schema.md —— 特征 schema（每特征含"可用时点"说明）
+- ml/leakage_audit.py —— 泄漏审计脚本（检测"特征用了未来数据"）
+- tests/test_features.py —— 单元测试（含泄漏审计测试、滚动标准化测试）
+
+Acceptance Criteria：
+- 泄漏审计能检测"特征用了未来数据"（测试：故意引入未来数据，审计必须报错）
+- 滚动标准化正确（测试：与手工逐窗口计算一致）
+- 特征/标签时间戳对齐（t→t+h 严格）
+- 可复现
+
+## 交付要求
+1. 文件落在 E:\lianghua1 对应路径
+2. 必须实际运行测试并全部通过：E:\Anaconda3-2026\python.exe -m pytest tests/test_metrics_enhanced.py tests/test_etf_data.py tests/test_features.py -v
+3. A4 与 C4 预留接口：metrics_enhanced.py 能接收 OOS/IS 两组权益序列做对比
+4. 中文注释、类型提示；akshare 网络不可用时允许合成数据但必须注明
+
+## 最终报告（用中文，控制在 250 行内）
+- 交付文件清单（含路径）
+- 每个文件的职责一句话
+- 单元测试结果（通过数/总数）
+- B1 的 PCF 解析与折溢价对齐要点；C1 防泄漏实现要点
+- 遇到的问题与处理方式

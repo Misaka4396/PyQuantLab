@@ -1,0 +1,51 @@
+# 批次 1 任务：A1 — 回测数据层与数据治理
+
+## 项目上下文
+你在 E:\lianghua1（PyQuantLab 量化交易平台仓库）工作。项目已有 data/（yfinance 下载、Parquet 缓存、数据编排、技术指标）、backtest/、strategy/、portfolio/、ui/ 等模块。本次为平台新增"回测数据层"能力，属于 A 通用底座第一批。CLAUDE.md 已含环境与规范，请先阅读仓库现有代码（重点 data/ 目录）再动手。
+
+主 Python 环境：E:\Anaconda3-2026\python.exe（akshare/tushare/yfinance/pandas 均已装）。
+
+## 任务正文
+Role：量化数据工程师
+
+Context：回测可靠性首先取决于数据。需构建 point-in-time 数据层，杜绝未来函数、幸存者偏差。默认 Python + pandas，A股，分钟级为主。
+
+Task：实现数据层：
+1. 数据获取：AKShare/Tushare 拉取 ETF/成分股/指数行情 + 复权因子；基金公司 PCF 篮子文件（PCF 为 ETF 套利用，A 底座需预留 schema，实际抓取在 B1 完成，本模块先定义 parquet schema 与加载接口）
+2. 清洗：缺失值、异常价、停牌、涨跌停处理
+3. Point-in-time 对齐：统一时间戳、前复权、公告日 vs 生效日（防未来函数）
+4. 幸存者偏差：记录成分股历史调进调出、退市股，构建"当时可交易全集"
+5. Schema：parquet 表（OHLCV、复权因子、成分股、PCF、NAV/IOPV）
+6. 缓存与增量更新
+
+Constraints：数据必须带 as_of 时间戳；下载脚本可复现；本地 parquet；免费源优先。
+
+Input：无（或数据源凭证）
+
+Output Format：
+- data/data_loader.py —— 统一数据加载入口（含 PIT 对齐、清洗、增量更新）
+- data/pit.py —— point-in-time 对齐与防前视工具
+- data/survivorship.py —— 幸存者偏差处理（成分股调进调出、退市股记录）
+- data/quality_report.py —— 数据质量报告脚本（统计缺失/异常率）
+- data/schemas.md —— parquet schema 文档
+- tests/test_data_governance.py —— 单元测试
+- 小样本演示数据（可用 akshare 拉取 1-2 只 A 股 ETF + 成分股若干天的日线/分钟线作为演示；网络失败则用合成数据并注明）
+
+Acceptance Criteria：
+- 同一时点只能见当时已发布数据（as_of 时间戳过滤生效）
+- 退市/调出股票在组合中正确消失（幸存者偏差测试通过）
+- 复权正确（前复权计算与已知基准一致）
+- 质量报告能统计缺失/异常率并输出 markdown 报告
+- 全部单元测试通过：E:\Anaconda3-2026\python.exe -m pytest tests/test_data_governance.py -v
+
+## 交付要求
+1. 以上文件全部落在 E:\lianghua1 对应路径，模块名与现有代码风格一致
+2. 必须实际运行单元测试并修复到全部通过，不得只写不测
+3. 中文注释、类型提示
+
+## 最终报告（用中文，控制在 200 行内）
+- 交付文件清单（含路径）
+- 每个文件的职责一句话
+- 单元测试结果（通过数/总数）
+- 防前视/幸存者偏差的实现要点
+- 遇到的问题与处理方式

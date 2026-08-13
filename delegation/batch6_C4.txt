@@ -1,0 +1,53 @@
+# 批次 6 任务：C4 — 过拟合检测与模型评估
+
+## 项目上下文
+你在 E:\lianghua1（PyQuantLab）工作。已完成模块：
+- A2 事件驱动引擎（engine/）、A4 绩效评估（backtest/metrics_enhanced.py、backtest/report.py）
+- C1 特征工程（ml/features.py）、C2 训练/验证框架（ml/cv.py、ml/walk_forward.py）
+- C3 模型训练（ml/train.py、ml/models_lgb.py、ml/models_torch.py、ml/torch_dataset.py、ml/model_registry.py、ml/retrain_scheduler.py、ml/run_config.py）
+
+先阅读相关文件了解接口。CLAUDE.md 含环境与规范。主 Python 环境：E:\Anaconda3-2026\python.exe（scikit-learn 已装）。
+
+本批次交付 C 专项收口模块：**C4 过拟合检测与模型评估**。
+
+## 任务正文
+Role：量化研究员（统计）
+
+Context：过拟合是最大杀手。需样本外评估 + 过拟合检测（deflated Sharpe、PBO、CSCV）甄别真信号 vs 噪声拟合。
+
+Task：实现评估/检测层：
+1. OOS vs IS 性能对比（退化幅度）
+2. Deflated Sharpe Ratio（多重检验校正）—— 输入：已观测 Sharpe、试验次数 N、偏度/峰度，输出 DSR
+3. PBO + CSCV（组合对称交叉验证）—— 实现 CSCV 的 S 个组合对称划分 + PBO 概率
+4. 特征重要性稳定性（跨 fold）
+5. 输出：过拟合风险结论 + 可上线判定建议
+
+Constraints：指标自实现或可靠实现（注明来源公式：Bailey & López de Prado 等）；给出明确判定阈值；与 A4 联动（metrics_enhanced.py 输入）。
+
+Input：C3 模型输出、A4 指标层
+
+Output Format：
+- ml/overfit.py —— 过拟合检测主模块（DSR、PBO、CSCV、OOS/IS 退化对比、判定结论）
+- ml/feature_importance.py —— 特征重要性稳定性分析（跨 fold 的 rank 稳定性/相关性）
+- ml/overfit_report.py —— 过拟合检测报告生成（markdown，含判定阈值、风险结论、上线建议）
+- tests/test_overfit.py —— 单元测试
+
+Acceptance Criteria：
+- 能输出 deflated Sharpe、PBO 数值（测试：已知输入的 DSR/PBO 与手算或参考实现一致）
+- OOS/IS 对比清晰（测试：构造 IS 好 OOS 差的序列，能输出退化幅度并判定风险）
+- 给出明确过拟合风险结论（含阈值：如 DSR < 0.95 高风险）
+- 能识别"回测漂亮实盘亏损"典型特征（测试：过拟合模型输出高风险结论）
+
+## 交付要求
+1. 文件落在 E:\lianghua1 对应路径
+2. 必须实际运行测试并全部通过：E:\Anaconda3-2026\python.exe -m pytest tests/test_overfit.py -v
+3. 公式注明来源（论文/书名），判定阈值明确写在配置或文档中
+4. 中文注释、类型提示
+
+## 最终报告（用中文，控制在 200 行内）
+- 交付文件清单（含路径）
+- 每个文件的职责一句话
+- 单元测试结果（通过数/总数）
+- DSR/PBO/CSCV 的实现要点与公式来源
+- 判定阈值设计
+- 遇到的问题与处理方式

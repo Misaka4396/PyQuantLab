@@ -1,0 +1,109 @@
+# 批次 4 任务：B2 — 折溢价信号与阈值 + B3 — 篮子同步执行与申赎 + C2 — 训练/验证框架（Purged CV）
+
+## 项目上下文
+你在 E:\lianghua1（PyQuantLab）工作。已完成模块：
+- A1 数据层：data/data_loader.py、data/pit.py、data/survivorship.py、data/quality_report.py
+- A2 事件驱动引擎：engine/（events/order/matching/portfolio/accounting/engine/config）
+- A3 成本模型：cost_model.py、cost_config.py
+- A4 绩效评估：backtest/metrics_enhanced.py、backtest/report.py
+- B1 ETF 套利数据层：etf/etf_data.py、etf/pcf_parser.py、etf/iopv_estimator.py
+- C1 特征工程：ml/features.py、ml/leakage_audit.py
+
+先阅读相关文件了解接口。CLAUDE.md 含环境与规范。主 Python 环境：E:\Anaconda3-2026\python.exe。
+
+本批次交付三个模块：**B2 折溢价信号与阈值模型**、**B3 篮子同步执行与申赎模拟**、**C2 训练/验证框架（滚动回测 + Purged CV）**。
+
+## B2 任务正文
+Role：量化策略研究员
+
+Context：核心是"何时开/平仓、阈值多少才覆盖成本"。
+
+Task：实现信号层：
+1. 折溢价 z-score/分位数（滚动窗口，禁全样本）
+2. 开仓阈值：折溢价幅度 > 交易成本 + 缓冲
+3. 平仓：回归均值/归零平仓；强制平仓（收盘前、止损）
+4. 阈值参数化，支持网格优化（注意过拟合，与 C4 联动——网格结果必须用滚动样本，禁止全样本寻优）
+5. 方向：溢价→卖 ETF 买篮子；折价→买 ETF 卖篮子
+6. 输出信号事件流（含开/平仓时间、方向、阈值依据）供 A2 引擎消费
+
+Constraints：阈值必须滚动样本计算（防前视）；成本覆盖引用 A3（cost_model.py）；有止损与收盘强平。
+
+Input：B1 数据层（etf/etf_data.py 的折溢价序列）、A3 成本模型
+
+Output Format：
+- etf/etf_signal.py —— 信号层（滚动 z-score/分位数、开平仓阈值逻辑、强平规则、方向判定）
+- etf/threshold_config.py —— 阈值参数配置（开仓缓冲、平仓规则、止损、收盘强平、网格参数范围）
+- etf/signal_grid.py —— 阈值网格优化（滚动样本内寻优，输出参数-绩效表，注明过拟合风险）
+- tests/test_etf_signal.py —— 单元测试
+
+Acceptance Criteria：
+- 信号无前视（测试：信号 t 时刻只用 t 及之前滚动窗口数据）
+- 开仓阈值逻辑上覆盖成本（测试：开仓阈值 ≥ 单位成本 + 缓冲）
+- 能输出开平仓信号事件流（DataFrame，字段含 ts/action/方向/阈值依据）
+
+## B3 任务正文
+Role：量化执行工程师
+
+Context：ETF 套利最大风险是"篮子同步成交困难"。需真实模拟执行不确定性。
+
+Task：实现执行模拟：
+1. 篮子下单：逐笔成交时延与部分成交
+2. 同步风险：部分股票未成交/延迟导致的敞口（tracking error）
+3. 滑点：篮子整体 + 个股滑点（引用 A3）
+4. 申赎机制（可选）：AP 实物/现金申赎、最小申赎单位、费用、T 日确认（开关默认关闭）
+5. 输出：实际成交成本、未成交/延迟部分、敞口暴露
+
+Constraints：执行时延可配（1-5 分钟）；部分成交概率可配；申赎为开关，默认关闭。
+
+Input：B1 数据层、A3 成本模型
+
+Output Format：
+- etf/basket_execution.py —— 执行模拟主模块（篮子下单、时延/部分成交、敞口计算、申赎开关）
+- etf/execution_config.py —— 执行配置（时延范围、部分成交概率、申赎参数）
+- tests/test_basket_execution.py —— 单元测试
+
+Acceptance Criteria：
+- 能模拟部分成交与延迟（测试：设置部分成交概率后输出有未成交部分）
+- 执行成本与 A3 一致（调用 cost_model.py 计费）
+- 申赎开关不影响二级对冲模式（关闭时走二级市场成交路径）
+- 输出敞口（tracking error）供风险评估
+
+## C2 任务正文
+Role：机器学习工程师 / 量化研究员
+
+Context：时序数据不能随机 K-fold。需滚动回测 + purged K-fold（带 embargo）正确评估与选模。
+
+Task：实现训练/验证框架：
+1. Walk-forward：训练/验证/测试按时间切分，定期重训
+2. Purged K-fold + embargo（López de Prado）用于超参选择
+3. 样本外严格隔离，绝不用于调参
+4. 训练/验证集之间 purge 重叠标签区间
+5. 输出：各 fold 指标、OOS 指标、重训时间点
+
+Constraints：重训周期可配；embargo 长度可配；OOS 结果只报告一次（防多次偷看）。
+
+Input：C1 特征层（ml/features.py 输出）
+
+Output Format：
+- ml/cv.py —— Purged K-fold + embargo 实现（含 purge 重叠标签、embargo 参数、fold 可视化数据）
+- ml/walk_forward.py —— Walk-forward 框架（时间切分、定期重训、OOS 只报告一次）
+- tests/test_cv.py —— 单元测试
+
+Acceptance Criteria：
+- 无训练/验证重叠（测试：purge+embargo 后 train/val 时间戳不相交）
+- purge/embargo 正确（测试：与手工实现一致）
+- OOS 与 IS 分报告（walk_forward 输出两组指标）
+- 重训时间点明确（输出重训 schedule）
+
+## 交付要求
+1. 文件落在 E:\lianghua1 对应路径
+2. 必须实际运行测试并全部通过：E:\Anaconda3-2026\python.exe -m pytest tests/test_etf_signal.py tests/test_basket_execution.py tests/test_cv.py -v
+3. B2 信号必须能被 A2 引擎消费（事件流 DataFrame 格式与 engine/events.py 兼容或提供转换函数）
+4. 中文注释、类型提示
+
+## 最终报告（用中文，控制在 250 行内）
+- 交付文件清单（含路径）
+- 每个文件的职责一句话
+- 单元测试结果（通过数/总数）
+- B2 防前视阈值实现要点；B3 部分成交模拟要点；C2 purge/embargo 实现要点
+- 遇到的问题与处理方式

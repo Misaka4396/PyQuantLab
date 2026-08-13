@@ -1,0 +1,82 @@
+# 批次 2 任务：A2 — 回测引擎核心 + A3 — 交易成本与滑点模型
+
+## 项目上下文
+你在 E:\lianghua1（PyQuantLab 量化交易平台仓库）工作。项目已有 data/、backtest/（向量化回测）、strategy/、portfolio/、ui/ 模块。批次 1 已完成 A1 数据层（data/data_loader.py、data/pit.py、data/survivorship.py、data/quality_report.py、data/schemas.md），先阅读这些文件了解数据层接口。CLAUDE.md 已含环境与规范。
+
+主 Python 环境：E:\Anaconda3-2026\python.exe。
+
+本批次交付两个模块：**A2 事件驱动回测引擎**（engine/ 包，本平台核心升级，为 ETF 篮子下单与 ML 滚动重训预留扩展点）与 **A3 成本模型**（cost_model.py，供 A2 挂载，ETF 套利与 ML 策略共用）。
+
+## A2 任务正文
+Role：系统架构 / 量化开发工程师
+
+Context：需事件驱动引擎，支持分钟级撮合、持仓资金核算、多标的，并为 ETF 篮子下单与 ML 滚动重训预留扩展点。不用 backtrader 等现成框架（扩展性差）。
+
+Task：实现引擎：
+1. 事件循环：market data → signal → order → fill → portfolio → accounting
+2. 撮合：按 bar 撮合（open/next-bar 可选），支持 limit/market 单
+3. 核算：现金、持仓、市值、权益曲线、可用资金、手续费预留
+4. 多标的支持（ETF + 成分股篮子）
+5. 回调/插件机制（供策略、成本模型、重训调度挂载）
+6. 复现：种子固定、参数配置化、日志
+
+Constraints：纯 Python；撮合与成本模型解耦；引擎不做策略决策；可回测多年分钟级数据。
+
+Input：A1 数据层（data/data_loader.py）
+
+Output Format：
+- engine/__init__.py
+- engine/events.py —— 事件定义（MarketDataEvent/SignalEvent/OrderEvent/FillEvent/PortfolioEvent）
+- engine/order.py —— 订单类型（market/limit，bar 内撮合 open/next-bar）
+- engine/matching.py —— 撮合逻辑（与成本模型解耦，通过接口注入）
+- engine/portfolio.py —— 现金/持仓/市值/权益/可用资金/手续费预留核算
+- engine/accounting.py —— 逐笔核算与权益曲线
+- engine/engine.py —— 事件循环主引擎（多标的、回调/插件注册）
+- engine/config.py —— 引擎配置（种子、初始资金、撮合模式、日志）
+- tests/test_engine.py —— 单元测试
+
+Acceptance Criteria：
+- 买入持有策略权益曲线与手算一致（测试含手算对照）
+- 撮合无前视（next-bar 撮合下，当 bar 信号不成交于当 bar open，测试验证）
+- 多标的核算正确
+- 可复现（同种子两次运行结果一致）
+- 回调机制可挂载自定义策略与成本模型
+
+## A3 任务正文
+Role：量化研究员
+
+Context：成本决定套利策略是否可行，尤其 ETF 篮子同步执行的滑点。
+
+Task：实现成本模型：
+1. 固定成本：佣金（万2.5 默认）、印花税（卖 0.05%）、过户费、ETF 免印花税
+2. 买卖价差：半价差模型（按流动性可配）
+3. 冲击成本：按成交量占比的冲击函数（sqrt/线性）
+4. 篮子成本：逐只计费 + 篮子整体滑点加成
+5. 参数可配置、输出逐笔成本明细
+
+Constraints：参数集中配置、默认值注明"以券商为准需确认"；成本明细可审计。
+
+Input：A1 数据层
+
+Output Format：
+- cost_model.py —— 成本模型主类（固定成本+价差+冲击+篮子，逐笔明细输出）
+- cost_config.py —— 参数集中配置（佣金/印花税/过户费/价差/冲击函数，默认值注明来源与"以券商为准需确认"）
+- tests/test_cost_model.py —— 单元测试（含成本敏感性测试：参数变化对总成本的敏感度）
+
+Acceptance Criteria：
+- 逐笔成本可追溯（每笔有明细条目）
+- 能跑出"成本敏感"结论（敏感性测试输出）
+- 与券商费率对账可调（参数可配置）
+
+## 交付要求
+1. 以上文件落在 E:\lianghua1 对应路径
+2. 必须实际运行测试并全部通过：E:\Anaconda3-2026\python.exe -m pytest tests/test_engine.py tests/test_cost_model.py -v
+3. engine 与 cost_model 解耦：engine 通过成本模型接口注入，不硬编码
+4. 中文注释、类型提示
+
+## 最终报告（用中文，控制在 200 行内）
+- 交付文件清单（含路径）
+- 每个文件的职责一句话
+- 单元测试结果（通过数/总数）
+- 撮合无前视的实现要点、成本明细示例
+- 遇到的问题与处理方式

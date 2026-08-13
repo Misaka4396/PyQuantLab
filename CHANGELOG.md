@@ -2,6 +2,34 @@
 
 本项目使用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式。
 
+## [v1.2.0] - 2026-08-13
+
+### 新增：A 通用底座（量化研究增强层）
+
+- A1 回测数据层与数据治理：`data/pit.py`（point-in-time 对齐、as_of 时间戳防前视）、`data/survivorship.py`（幸存者偏差处理、退市/调出股生命周期追踪）、`data/data_loader.py`（统一加载入口、增量更新）、`data/quality_report.py`（数据质量报告）、`data/schemas.py` + `data/schemas.md`（parquet schema 文档）
+- A2 事件驱动回测引擎：`engine/` 包（events/order/matching/portfolio/accounting/engine/config），支持多标的、next-bar 撮合无前视、插件回调机制、固定种子可复现
+- A3 交易成本与滑点模型：`cost_model.py` + `cost_config.py`（佣金/印花税/过户费/半价差/冲击成本/篮子加成，逐笔明细可审计，参数集中配置）
+- A4 绩效评估与报告：`backtest/metrics_enhanced.py`（收益/风险/交易/成本占比全指标）、`backtest/report.py` 扩展 `ReportGenerator`（权益/回撤/月度热力图/成本占比 + HTML 报告 + trade CSV 导出；旧版 `BacktestReport` 保留兼容 UI）
+
+### 新增：B ETF 套利专项
+
+- B1 ETF 套利数据层：`etf/etf_data.py`（IOPV/NAV/PCF 对齐、折溢价序列）、`etf/pcf_parser.py`（PCF 篮子解析）、`etf/iopv_estimator.py`（IOPV 合成估算）、`etf/demo_data/`
+- B2 折溢价信号与阈值：`etf/etf_signal.py`（滚动 z-score 防前视、开仓阈值=成本+缓冲、强平规则）、`etf/threshold_config.py`、`etf/signal_grid.py`（滚动样本内网格优化）
+- B3 篮子同步执行与申赎：`etf/basket_execution.py`（逐腿时延/部分成交模拟、敞口 tracking error、申赎开关默认关闭）、`etf/execution_config.py`
+- B4 套利回测集成：`etf/etf_strategy.py` + `etf/etf_backtest.py`（挂载 A2 引擎、理想 vs 含同步风险双模式、容量分析、压力测试）
+
+### 新增：C ML/DL 专项
+
+- C1 特征工程与标注：`ml/features.py`（防泄漏特征流水线、滚动标准化、t→t+h 标签对齐、版本化存储）、`ml/leakage_audit.py`（三类泄漏审计）、`ml/features_schema.md`
+- C2 训练/验证框架：`ml/cv.py`（Purged K-fold + embargo）、`ml/walk_forward.py`（滚动回测、重训调度、OOS 只报告一次）
+- C3 模型训练与重训调度：`ml/models_lgb.py`（LightGBM 基线可复现）、`ml/models_torch.py`（PyTorch LSTM/Transformer）、`ml/torch_dataset.py`（时序窗口、禁跨时间 shuffle）、`ml/model_registry.py`（模型 sha256 版本绑定/回滚）、`ml/retrain_scheduler.py`、`ml/train.py`、`ml/run_config.py`
+- C4 过拟合检测与评估：`ml/overfit.py`（Deflated Sharpe / PBO / CSCV）、`ml/feature_importance.py`（特征重要性跨 fold 稳定性）、`ml/overfit_report.py`（风险结论 + 上线建议）
+
+### 其他
+
+- `core/exceptions.py` 新增 `EngineError`
+- `tests/` 新增 7 个测试文件（146 个用例全覆盖 A/B/C 三专项）
+
 ## [v1.1.0] - 2026-08-06
 
 ### 文档规范化
