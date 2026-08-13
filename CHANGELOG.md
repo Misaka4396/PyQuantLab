@@ -2,6 +2,18 @@
 
 本项目使用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式。
 
+## [v1.2.1] - 2026-08-13
+
+### 变更：exe 发布拆分（方案 B）
+
+- 原单 exe（722MB）拆分为双 exe，按需分发：
+  - `dist/PyQuantLab/PyQuantLab.exe`：主程序（GUI + 回测 + ETF 数据/信号 + akshare），**347MB**（-52%）
+  - `dist/PyQuantLab_ML/PyQuantLab_ML.exe`：ML/DL 训练器（torch CPU + lightgbm + sklearn，console CLI），**419MB**
+- 新增 `ml_trainer_cli.py`：训练器 CLI 入口（`train` / `registry list|rollback` / `overfit` 三个子命令，Windows 控制台 UTF-8 输出）
+- 新增 `PyQuantLab_ML.spec`：ML 训练器独立打包配置（排除 PyQt5/akshare/可视化冗余）
+- `PyQuantLab_Qt.spec` 瘦身：移除 torch/lightgbm/sklearn 依赖，排除 QtWebEngine（-112MB）、panel/bokeh/botocore/cv2/numba 等 akshare 链冗余
+- 验证：主程序 GUI 启动正常；ML 训练器 registry/overfit/train（LightGBM 全流程）实测通过
+
 ## [v1.2.0] - 2026-08-13
 
 ### 新增：A 通用底座（量化研究增强层）
