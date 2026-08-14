@@ -35,9 +35,6 @@ with st.sidebar:
         label_visibility="collapsed",
     )
     st.markdown("---")
-    st.caption(
-        "Workflow: Load Data → Configure Strategy → "
-        "Run Backtest → Analyze Results"
-    )
+    st.caption("Workflow: Load Data → Configure Strategy → Run Backtest → Analyze Results")
 
 PAGE_OPTIONS[page]()

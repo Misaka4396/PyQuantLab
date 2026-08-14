@@ -1,25 +1,22 @@
 """Vectorized backtesting engine — no Python loops over time steps."""
 
-from typing import Dict, List, Optional
-
-import numpy as np
 import pandas as pd
 
-from core.types import BacktestConfig, BacktestResult
 from backtest.metrics import MetricsCalculator
+from core.types import BacktestConfig, BacktestResult
 from strategy.base import BaseStrategy
 
 
 class BacktestEngine:
-    def __init__(self, config: Optional[BacktestConfig] = None):
+    def __init__(self, config: BacktestConfig | None = None):
         self.config = config or BacktestConfig()
 
     def run(
         self,
         data: pd.DataFrame,
         strategy: BaseStrategy,
-        ticker: Optional[str] = None,
-        benchmark_data: Optional[pd.DataFrame] = None,
+        ticker: str | None = None,
+        benchmark_data: pd.DataFrame | None = None,
     ) -> BacktestResult:
         close = self._get_close(data, ticker)
         returns = close.pct_change().fillna(0.0)
@@ -30,11 +27,14 @@ class BacktestEngine:
         trade_mask = positions.diff().fillna(0) != 0
         strategy_returns[trade_mask] -= self.config.commission
         equity = (1 + strategy_returns).cumprod() * self.config.initial_capital
-        equity_curve = pd.DataFrame({
-            "equity": equity,
-            "returns": strategy_returns,
-            "position": positions,
-        }, index=data.index)
+        equity_curve = pd.DataFrame(
+            {
+                "equity": equity,
+                "returns": strategy_returns,
+                "position": positions,
+            },
+            index=data.index,
+        )
 
         trades = self._compute_trades(positions, close)
         benchmark_returns = None
@@ -58,9 +58,9 @@ class BacktestEngine:
     def run_comparison(
         self,
         data: pd.DataFrame,
-        strategies: Dict[str, BaseStrategy],
-        ticker: Optional[str] = None,
-    ) -> Dict[str, BacktestResult]:
+        strategies: dict[str, BaseStrategy],
+        ticker: str | None = None,
+    ) -> dict[str, BacktestResult]:
         results = {}
         for name, strategy in strategies.items():
             results[name] = self.run(data, strategy, ticker)
@@ -96,15 +96,17 @@ class BacktestEngine:
                 exit_date = close.index[i]
                 pnl = exit_price - entry_price
                 pnl_pct = pnl / entry_price
-                trades.append({
-                    "entry_date": entry_date,
-                    "exit_date": exit_date,
-                    "entry_price": entry_price,
-                    "exit_price": exit_price,
-                    "pnl": pnl,
-                    "pnl_pct": pnl_pct,
-                    "win": pnl > 0,
-                })
+                trades.append(
+                    {
+                        "entry_date": entry_date,
+                        "exit_date": exit_date,
+                        "entry_price": entry_price,
+                        "exit_price": exit_price,
+                        "pnl": pnl,
+                        "pnl_pct": pnl_pct,
+                        "win": pnl > 0,
+                    }
+                )
                 in_position = False
 
         # Close open position at end
@@ -113,21 +115,35 @@ class BacktestEngine:
             exit_date = close.index[-1]
             pnl = exit_price - entry_price
             pnl_pct = pnl / entry_price
-            trades.append({
-                "entry_date": entry_date,
-                "exit_date": exit_date,
-                "entry_price": entry_price,
-                "exit_price": exit_price,
-                "pnl": pnl,
-                "pnl_pct": pnl_pct,
-                "win": pnl > 0,
-            })
+            trades.append(
+                {
+                    "entry_date": entry_date,
+                    "exit_date": exit_date,
+                    "entry_price": entry_price,
+                    "exit_price": exit_price,
+                    "pnl": pnl,
+                    "pnl_pct": pnl_pct,
+                    "win": pnl > 0,
+                }
+            )
 
-        return pd.DataFrame(trades) if trades else pd.DataFrame(
-            columns=["entry_date", "exit_date", "entry_price", "exit_price", "pnl", "pnl_pct", "win"]
+        return (
+            pd.DataFrame(trades)
+            if trades
+            else pd.DataFrame(
+                columns=[
+                    "entry_date",
+                    "exit_date",
+                    "entry_price",
+                    "exit_price",
+                    "pnl",
+                    "pnl_pct",
+                    "win",
+                ]
+            )
         )
 
-    def _get_close(self, data: pd.DataFrame, ticker: Optional[str] = None) -> pd.Series:
+    def _get_close(self, data: pd.DataFrame, ticker: str | None = None) -> pd.Series:
         if isinstance(data.columns, pd.MultiIndex):
             if ticker is None:
                 ticker = data.columns.levels[0][0]

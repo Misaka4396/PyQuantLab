@@ -3,8 +3,8 @@
 import os
 import sys
 import threading
-import webbrowser
 import time
+import webbrowser
 
 # Ensure the project directory is on sys.path
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))

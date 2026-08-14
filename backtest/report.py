@@ -8,15 +8,21 @@
 旧版 ``BacktestReport``（消费 core.types.BacktestResult）保留在文件末尾，
 供 ui/pages 与 ui/pages_qt 的向量化回测页面继续使用。
 """
+
 from __future__ import annotations
 
 import base64
+import contextlib
 import io
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 import matplotlib
+import numpy as np
+import pandas as pd
+
+from backtest.metrics_enhanced import PerformanceAnalyzer, build_round_trips
+from core.types import BacktestResult  # 旧版 BacktestReport 依赖
 
 matplotlib.use("Agg")  # 无界面环境生成图（服务器/测试）
 import matplotlib.pyplot as plt
@@ -24,11 +30,6 @@ import matplotlib.pyplot as plt
 # 中文标题/标签渲染：Windows 优先中文字体，缺失时回退默认（仅影响图内文字显示）
 plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "DejaVu Sans"]
 plt.rcParams["axes.unicode_minus"] = False
-import numpy as np
-import pandas as pd
-
-from backtest.metrics_enhanced import PerformanceAnalyzer, build_round_trips
-from core.types import BacktestResult  # 旧版 BacktestReport 依赖
 
 
 # ---------------------------------------------------------------------------
@@ -42,7 +43,7 @@ class ReportGenerator:
         self.title = title
 
     # ------------------------------ 绘图 ------------------------------
-    def plot_figure(self) -> "plt.Figure":
+    def plot_figure(self) -> plt.Figure:
         """生成 2x2 组合图（权益、回撤、月度热力图、成本占比）。"""
         a = self.analyzer
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
@@ -102,27 +103,42 @@ class ReportGenerator:
         return fig
 
     # ------------------------------ 输出 ------------------------------
-    def export_trades(self, path: Union[str, Path]) -> str:
+    def export_trades(self, path: str | Path) -> str:
         """把 FIFO 平仓交易导出为 CSV，返回文件路径。"""
         trips = build_round_trips(self.analyzer.fills, self.analyzer.equity.index)
         if trips:
-            df = pd.DataFrame([{
-                "symbol": t.symbol,
-                "entry_time": t.entry_time,
-                "exit_time": t.exit_time,
-                "quantity": t.quantity,
-                "entry_price": t.entry_price,
-                "exit_price": t.exit_price,
-                "pnl": t.pnl,
-                "pnl_pct": t.pnl_pct,
-                "win": t.win,
-                "holding_bars": t.holding_bars,
-            } for t in trips])
+            df = pd.DataFrame(
+                [
+                    {
+                        "symbol": t.symbol,
+                        "entry_time": t.entry_time,
+                        "exit_time": t.exit_time,
+                        "quantity": t.quantity,
+                        "entry_price": t.entry_price,
+                        "exit_price": t.exit_price,
+                        "pnl": t.pnl,
+                        "pnl_pct": t.pnl_pct,
+                        "win": t.win,
+                        "holding_bars": t.holding_bars,
+                    }
+                    for t in trips
+                ]
+            )
         else:
-            df = pd.DataFrame(columns=[
-                "symbol", "entry_time", "exit_time", "quantity",
-                "entry_price", "exit_price", "pnl", "pnl_pct", "win", "holding_bars",
-            ])
+            df = pd.DataFrame(
+                columns=[
+                    "symbol",
+                    "entry_time",
+                    "exit_time",
+                    "quantity",
+                    "entry_price",
+                    "exit_price",
+                    "pnl",
+                    "pnl_pct",
+                    "win",
+                    "holding_bars",
+                ]
+            )
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(p, index=False, encoding="utf-8-sig")
@@ -134,12 +150,26 @@ class ReportGenerator:
         metrics = a.to_dataframe()
         metrics_html = metrics.to_html(index=False, border=0, classes="metrics")
         trips = build_round_trips(a.fills, a.equity.index)
-        trades_df = pd.DataFrame([{
-            "symbol": t.symbol, "entry_time": t.entry_time, "exit_time": t.exit_time,
-            "quantity": t.quantity, "pnl": round(t.pnl, 2), "pnl_pct": round(t.pnl_pct, 4),
-            "win": t.win, "holding_bars": t.holding_bars,
-        } for t in trips])
-        trades_html = trades_df.to_html(index=False, border=0, classes="trades") if trips else "<p>无平仓交易</p>"
+        trades_df = pd.DataFrame(
+            [
+                {
+                    "symbol": t.symbol,
+                    "entry_time": t.entry_time,
+                    "exit_time": t.exit_time,
+                    "quantity": t.quantity,
+                    "pnl": round(t.pnl, 2),
+                    "pnl_pct": round(t.pnl_pct, 4),
+                    "win": t.win,
+                    "holding_bars": t.holding_bars,
+                }
+                for t in trips
+            ]
+        )
+        trades_html = (
+            trades_df.to_html(index=False, border=0, classes="trades")
+            if trips
+            else "<p>无平仓交易</p>"
+        )
 
         return f"""<!DOCTYPE html>
 <html lang="zh">
@@ -166,10 +196,10 @@ table.metrics td, table.trades td, table.trades th {{ padding: 4px 10px; border-
 
     def generate(
         self,
-        output_dir: Union[str, Path],
+        output_dir: str | Path,
         name: str = "report",
         show: bool = False,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """一键生成报告，返回各产物路径 dict：png / html / trades_csv。"""
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
@@ -190,10 +220,8 @@ table.metrics td, table.trades td, table.trades th {{ padding: 4px 10px; border-
         csv_path = self.export_trades(out / f"{name}_trades.csv")
 
         if show:
-            try:
+            with contextlib.suppress(Exception):
                 plt.show()
-            except Exception:
-                pass
 
         return {
             "png": str(png_path),
@@ -217,7 +245,7 @@ def _monthly_heatmap_matrix(monthly: pd.Series) -> pd.DataFrame:
     return heat
 
 
-def _cost_breakdown(fills: pd.DataFrame) -> Dict[str, float]:
+def _cost_breakdown(fills: pd.DataFrame) -> dict[str, float]:
     """固定费用分项合计：佣金 / 印花税 / 过户费。"""
     if fills is None or len(fills) == 0:
         return {}
@@ -283,8 +311,7 @@ class BacktestReport:
                 "slippage": self.result.config.slippage,
             },
             "metrics": {
-                k: v for k, v in self.result.metrics.__dict__.items()
-                if not k.startswith("_")
+                k: v for k, v in self.result.metrics.__dict__.items() if not k.startswith("_")
             },
             "total_trades": len(self.result.trades),
         }

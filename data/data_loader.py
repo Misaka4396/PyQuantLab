@@ -12,11 +12,12 @@
 - 落盘的是"原始已归一化"数据；清洗（缺失/异常/停牌/涨跌停）在读取时进行，
   这样质量报告仍能基于原始数据统计缺失率与异常率。
 """
+
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -30,7 +31,7 @@ from data.pit import (
 )
 from data.survivorship import build_tradeable_universe
 
-DateLike = Union[str, datetime, pd.Timestamp]
+DateLike = str | datetime | pd.Timestamp
 
 DEFAULT_DATA_ROOT = Path("./data_cache/pit")
 
@@ -59,7 +60,9 @@ def detect_limit_status(df: pd.DataFrame, limit_pct: float = 0.10) -> pd.Series:
     return status
 
 
-def clean_ohlcv(df: pd.DataFrame, limit_pct: float = 0.10, ffill_close: bool = True) -> pd.DataFrame:
+def clean_ohlcv(
+    df: pd.DataFrame, limit_pct: float = 0.10, ffill_close: bool = True
+) -> pd.DataFrame:
     """清洗 OHLCV 长表：去重排序、异常价、缺失值、停牌、涨跌停。
 
     处理步骤：
@@ -127,7 +130,7 @@ def pivot_close(df: pd.DataFrame) -> pd.DataFrame:
 class DataLoader:
     """统一数据层入口：负责各 parquet 表的读写、PIT 过滤与增量更新。"""
 
-    def __init__(self, data_root: Union[str, Path] = DEFAULT_DATA_ROOT):
+    def __init__(self, data_root: str | Path = DEFAULT_DATA_ROOT):
         self.data_root = Path(data_root)
         self.data_root.mkdir(parents=True, exist_ok=True)
 
@@ -161,7 +164,9 @@ class DataLoader:
             df[sc.COL_AS_OF] = idx + pd.Timedelta(default_lag)
         return df
 
-    def _prepare_ohlcv(self, symbol: str, df: pd.DataFrame, default_as_of_lag: str = "0D") -> pd.DataFrame:
+    def _prepare_ohlcv(
+        self, symbol: str, df: pd.DataFrame, default_as_of_lag: str = "0D"
+    ) -> pd.DataFrame:
         """归一化 OHLCV（不落盘）：时间索引、必填列校验、补可选列、去重排序。"""
         df = df.copy()
         if sc.COL_DATETIME in df.columns:
@@ -184,7 +189,9 @@ class DataLoader:
         df = df[~df.index.duplicated(keep="last")].sort_index()
         return df
 
-    def save_ohlcv(self, symbol: str, df: pd.DataFrame, default_as_of_lag: str = "0D") -> pd.DataFrame:
+    def save_ohlcv(
+        self, symbol: str, df: pd.DataFrame, default_as_of_lag: str = "0D"
+    ) -> pd.DataFrame:
         """落盘 OHLCV（覆盖写）。返回归一化后的 DataFrame。"""
         prepared = self._prepare_ohlcv(symbol, df, default_as_of_lag)
         prepared.to_parquet(self._ohlcv_path(symbol), index=True)
@@ -193,9 +200,9 @@ class DataLoader:
     def load_ohlcv(
         self,
         symbol: str,
-        start: Optional[DateLike] = None,
-        end: Optional[DateLike] = None,
-        as_of: Optional[DateLike] = None,
+        start: DateLike | None = None,
+        end: DateLike | None = None,
+        as_of: DateLike | None = None,
         clean: bool = True,
     ) -> pd.DataFrame:
         """读取 OHLCV，支持时间区间与 as_of 过滤，按需清洗。
@@ -220,15 +227,14 @@ class DataLoader:
     def load_ohlcv_many(
         self,
         symbols: Iterable[str],
-        start: Optional[DateLike] = None,
-        end: Optional[DateLike] = None,
-        as_of: Optional[DateLike] = None,
+        start: DateLike | None = None,
+        end: DateLike | None = None,
+        as_of: DateLike | None = None,
         clean: bool = True,
     ) -> pd.DataFrame:
         """批量读取多只证券，纵向拼接为长表。"""
         frames = [
-            self.load_ohlcv(s, start=start, end=end, as_of=as_of, clean=clean)
-            for s in symbols
+            self.load_ohlcv(s, start=start, end=end, as_of=as_of, clean=clean) for s in symbols
         ]
         frames = [f for f in frames if not f.empty]
         if not frames:
@@ -244,15 +250,12 @@ class DataLoader:
         """增量更新：合并新 bar，按时间戳去重（保留最新），覆盖写回。"""
         prepared = self._prepare_ohlcv(symbol, new_df, default_as_of_lag)
         existing = self.load_ohlcv(symbol, clean=False)
-        if existing.empty:
-            combined = prepared
-        else:
-            combined = pd.concat([existing, prepared])
+        combined = prepared if existing.empty else pd.concat([existing, prepared])
         combined = combined[~combined.index.duplicated(keep="last")].sort_index()
         combined.to_parquet(self._ohlcv_path(symbol), index=True)
         return combined
 
-    def list_ohlcv_symbols(self) -> List[str]:
+    def list_ohlcv_symbols(self) -> list[str]:
         """返回已落盘的全部行情代码。"""
         d = self.data_root / SUBDIR_OHLCV
         if not d.exists():
@@ -271,7 +274,7 @@ class DataLoader:
         factor.to_parquet(self._adj_path(symbol), index=True)
         return factor
 
-    def load_adj_factor(self, symbol: str, as_of: Optional[DateLike] = None) -> pd.DataFrame:
+    def load_adj_factor(self, symbol: str, as_of: DateLike | None = None) -> pd.DataFrame:
         """读取复权因子，可选 as_of 过滤（仅含当时已知的除权事件）。"""
         path = self._adj_path(symbol)
         if not path.exists():
@@ -305,7 +308,7 @@ class DataLoader:
         out.to_parquet(self._constituents_path(index_code), index=False)
         return out
 
-    def load_constituents(self, index_code: str, as_of: Optional[DateLike] = None) -> pd.DataFrame:
+    def load_constituents(self, index_code: str, as_of: DateLike | None = None) -> pd.DataFrame:
         """读取成分股会员记录，可选 as_of 过滤。"""
         path = self._constituents_path(index_code)
         if not path.exists():
@@ -315,7 +318,7 @@ class DataLoader:
             df = slice_as_of(df, as_of)
         return df
 
-    def get_tradeable_universe(self, index_code: str, as_of: DateLike) -> List[str]:
+    def get_tradeable_universe(self, index_code: str, as_of: DateLike) -> list[str]:
         """返回指数在 as_of 时点的"当时可交易全集"。"""
         membership = self.load_constituents(index_code)
         return build_tradeable_universe(membership, as_of)
@@ -338,7 +341,9 @@ class DataLoader:
         out.to_parquet(self._pcf_path(etf_code, trade_date), index=False)
         return out
 
-    def load_pcf(self, etf_code: str, trade_date: Optional[str] = None, as_of: Optional[DateLike] = None) -> pd.DataFrame:
+    def load_pcf(
+        self, etf_code: str, trade_date: str | None = None, as_of: DateLike | None = None
+    ) -> pd.DataFrame:
         """读取 PCF 篮子文件；trade_date 为空时返回该 ETF 全部篮子文件。"""
         d = self._subdir(SUBDIR_PCF)
         if trade_date is not None:
@@ -384,9 +389,9 @@ class DataLoader:
     def load_nav(
         self,
         etf_code: str,
-        start: Optional[DateLike] = None,
-        end: Optional[DateLike] = None,
-        as_of: Optional[DateLike] = None,
+        start: DateLike | None = None,
+        end: DateLike | None = None,
+        as_of: DateLike | None = None,
     ) -> pd.DataFrame:
         """读取 NAV/IOPV，支持时间区间与 as_of 过滤。"""
         path = self._nav_path(etf_code)

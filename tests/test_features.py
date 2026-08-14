@@ -8,6 +8,7 @@
 - 干净特征通过审计（无误报）
 - 可复现 + 特征版本化存储
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -15,15 +16,15 @@ import pandas as pd
 import pytest
 
 from ml.features import (
-    build_labels,
-    build_features,
-    rolling_standardize,
-    assemble,
-    FeatureStore,
-    LABEL_FWD_RETURN,
-    LABEL_FWD_DIRECTION,
-    LABEL_FWD_VOLATILITY,
     LABEL_ASOF,
+    LABEL_FWD_DIRECTION,
+    LABEL_FWD_RETURN,
+    LABEL_FWD_VOLATILITY,
+    FeatureStore,
+    assemble,
+    build_features,
+    build_labels,
+    rolling_standardize,
 )
 from ml.leakage_audit import LeakageAuditor, LeakageError
 
@@ -36,17 +37,25 @@ def make_ohlcv(closes, opens=None, highs=None, lows=None, volumes=None):
     highs = highs if highs is not None else closes
     lows = lows if lows is not None else closes
     volumes = volumes if volumes is not None else [1000.0] * n
-    return pd.DataFrame({
-        "open": opens, "high": highs, "low": lows, "close": closes, "volume": volumes,
-    }, index=idx)
+    return pd.DataFrame(
+        {
+            "open": opens,
+            "high": highs,
+            "low": lows,
+            "close": closes,
+            "volume": volumes,
+        },
+        index=idx,
+    )
 
 
 # ---------------------------------------------------------------------------
 # 标注：t → t+h 对齐
 # ---------------------------------------------------------------------------
 def test_labels_fwd_return_and_asof():
-    prices = pd.Series([100.0, 110.0, 99.0, 108.9],
-                       index=pd.date_range("2024-01-01", periods=4, freq="B"))
+    prices = pd.Series(
+        [100.0, 110.0, 99.0, 108.9], index=pd.date_range("2024-01-01", periods=4, freq="B")
+    )
     labels = build_labels(prices, horizon=2)
     # fwd_return_t = close_{t+2}/close_t - 1
     assert labels.loc[prices.index[0], LABEL_FWD_RETURN] == pytest.approx(99.0 / 100.0 - 1)
@@ -58,8 +67,7 @@ def test_labels_fwd_return_and_asof():
 
 
 def test_labels_direction():
-    prices = pd.Series([100.0, 90.0, 80.0],
-                       index=pd.date_range("2024-01-01", periods=3, freq="B"))
+    prices = pd.Series([100.0, 90.0, 80.0], index=pd.date_range("2024-01-01", periods=3, freq="B"))
     labels = build_labels(prices, horizon=1)
     assert labels.loc[prices.index[0], LABEL_FWD_DIRECTION] == -1
     assert labels.loc[prices.index[0], LABEL_FWD_RETURN] == pytest.approx(-0.1)
@@ -67,13 +75,16 @@ def test_labels_direction():
 
 def test_labels_volatility():
     """fwd_volatility_t = std(returns_{t+1..t+h})，用已知收益手算对照。"""
-    prices = pd.Series([100.0, 110.0, 99.0, 108.9],
-                       index=pd.date_range("2024-01-01", periods=4, freq="B"))
+    prices = pd.Series(
+        [100.0, 110.0, 99.0, 108.9], index=pd.date_range("2024-01-01", periods=4, freq="B")
+    )
     labels = build_labels(prices, horizon=2)
     # returns = [NaN, 0.1, -0.1, 0.1]；h=2：fwd_vol[0]=std(0.1,-0.1)=0.14142
     expected = np.std([0.1, -0.1], ddof=1)
     assert labels.loc[prices.index[0], LABEL_FWD_VOLATILITY] == pytest.approx(expected)
-    assert labels.loc[prices.index[1], LABEL_FWD_VOLATILITY] == pytest.approx(np.std([-0.1, 0.1], ddof=1))
+    assert labels.loc[prices.index[1], LABEL_FWD_VOLATILITY] == pytest.approx(
+        np.std([-0.1, 0.1], ddof=1)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +117,7 @@ def test_rolling_standardize_matches_manual():
     out = rolling_standardize(df, window=3)
     # 手工：z_t = (x_t - mean(window)) / std(window, ddof=1)
     for t in range(2, 5):
-        win = x[t - 2:t + 1]
+        win = x[t - 2 : t + 1]
         expected = (x[t] - np.mean(win)) / np.std(win, ddof=1)
         assert out["x"].iloc[t] == pytest.approx(expected)
     assert pd.isna(out["x"].iloc[0])
@@ -118,8 +129,10 @@ def test_rolling_standardize_matches_manual():
 # ---------------------------------------------------------------------------
 def test_leakage_audit_detects_future_label():
     """故意把特征设为未来标签（fwd_return），审计必须报错。"""
-    prices = pd.Series([100.0, 102.0, 101.0, 104.0, 106.0, 103.0, 107.0, 110.0],
-                       index=pd.date_range("2024-01-01", periods=8, freq="B"))
+    prices = pd.Series(
+        [100.0, 102.0, 101.0, 104.0, 106.0, 103.0, 107.0, 110.0],
+        index=pd.date_range("2024-01-01", periods=8, freq="B"),
+    )
     labels = build_labels(prices, horizon=2)
     features = pd.DataFrame({"cheat": labels[LABEL_FWD_RETURN]}, index=prices.index)
 
@@ -135,8 +148,9 @@ def test_leakage_audit_detects_future_label():
 
 def test_leakage_audit_detects_future_price():
     """故意把特征设为未来价格 close_{t+1}，审计必须报错。"""
-    prices = pd.Series([100.0, 102.0, 101.0, 104.0, 106.0],
-                       index=pd.date_range("2024-01-01", periods=5, freq="B"))
+    prices = pd.Series(
+        [100.0, 102.0, 101.0, 104.0, 106.0], index=pd.date_range("2024-01-01", periods=5, freq="B")
+    )
     labels = build_labels(prices, horizon=1)
     features = pd.DataFrame({"future_price": prices.shift(-1)}, index=prices.index)
 

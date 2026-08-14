@@ -12,10 +12,11 @@
 与 ml.cv 的 Purged K-fold 分工：本模块做最终滚动回测评估，Purged K-fold 做超参
 选择（见 cv.py）。
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -41,11 +42,11 @@ class WalkForwardSplit:
 class WalkForwardResult:
     """Walk-forward 评估结果。"""
 
-    folds: List[WalkForwardSplit]
-    is_metrics: pd.DataFrame       # 样本内指标（每 fold）
-    oos_metrics: pd.DataFrame      # 样本外指标（每 fold）
+    folds: list[WalkForwardSplit]
+    is_metrics: pd.DataFrame  # 样本内指标（每 fold）
+    oos_metrics: pd.DataFrame  # 样本外指标（每 fold）
     retrain_schedule: pd.DataFrame  # 重训 schedule（fold / retrain_time / 区间）
-    oos_predictions: pd.Series     # OOS 预测（每个测试样本只预测一次）
+    oos_predictions: pd.Series  # OOS 预测（每个测试样本只预测一次）
     is_overall: float = 0.0
     oos_overall: float = 0.0
     _oos_reported: bool = field(default=False, repr=False)
@@ -65,7 +66,7 @@ class WalkForward:
         self,
         n_train: int,
         n_test: int,
-        step: Optional[int] = None,
+        step: int | None = None,
         retrain_every: int = 1,
         embargo: int = 0,
         purge_horizon: int = 0,
@@ -84,11 +85,11 @@ class WalkForward:
         self.purge_horizon = int(purge_horizon)
 
     # ------------------------------------------------------------------
-    def split(self, times) -> List[WalkForwardSplit]:
+    def split(self, times) -> list[WalkForwardSplit]:
         """按时间顺序切分训练/测试，返回切分列表（含重训标记）。"""
         idx = as_sorted_index(times)
         n = len(idx)
-        splits: List[WalkForwardSplit] = []
+        splits: list[WalkForwardSplit] = []
         fold = 0
         start = 0
         while start + self.n_train + self.embargo + self.n_test <= n:
@@ -102,17 +103,19 @@ class WalkForward:
                 cutoff = test_start - self.purge_horizon
                 train_idx = train_idx[train_idx < cutoff]
 
-            retrain = (fold % self.retrain_every == 0)
-            splits.append(WalkForwardSplit(
-                fold=fold,
-                train_idx=train_idx,
-                test_idx=np.arange(test_start, test_end),
-                retrain=retrain,
-                train_start=idx[int(train_idx[0])] if len(train_idx) else pd.NaT,
-                train_end=idx[int(train_idx[-1])] if len(train_idx) else pd.NaT,
-                test_start=idx[test_start],
-                test_end=idx[test_end - 1],
-            ))
+            retrain = fold % self.retrain_every == 0
+            splits.append(
+                WalkForwardSplit(
+                    fold=fold,
+                    train_idx=train_idx,
+                    test_idx=np.arange(test_start, test_end),
+                    retrain=retrain,
+                    train_start=idx[int(train_idx[0])] if len(train_idx) else pd.NaT,
+                    train_end=idx[int(train_idx[-1])] if len(train_idx) else pd.NaT,
+                    test_start=idx[test_start],
+                    test_end=idx[test_end - 1],
+                )
+            )
             start += self.step
             fold += 1
         return splits
@@ -137,7 +140,9 @@ class WalkForward:
         """
         idx = as_sorted_index(times)
         splits = self.split(idx)
-        Xa = X if isinstance(X, (pd.DataFrame, pd.Series)) else pd.DataFrame(np.asarray(X), index=idx)
+        Xa = (
+            X if isinstance(X, pd.DataFrame | pd.Series) else pd.DataFrame(np.asarray(X), index=idx)
+        )
         ya = y if isinstance(y, pd.Series) else pd.Series(np.asarray(y), index=idx)
 
         model = model_fn()
@@ -156,14 +161,16 @@ class WalkForward:
             if sp.retrain:
                 model = model_fn()
                 fit(model, Xtr, ytr)
-                retrain_rows.append({
-                    "fold": sp.fold,
-                    "retrain_time": sp.train_end,
-                    "train_start": sp.train_start,
-                    "train_end": sp.train_end,
-                    "test_start": sp.test_start,
-                    "test_end": sp.test_end,
-                })
+                retrain_rows.append(
+                    {
+                        "fold": sp.fold,
+                        "retrain_time": sp.train_end,
+                        "train_start": sp.train_start,
+                        "train_end": sp.train_end,
+                        "test_start": sp.test_start,
+                        "test_end": sp.test_end,
+                    }
+                )
 
             pred_tr = np.asarray(predict(model, Xtr)).ravel()
             pred_te = np.asarray(predict(model, Xte)).ravel()
@@ -180,10 +187,14 @@ class WalkForward:
         retrain_schedule = pd.DataFrame(retrain_rows)
         oos_pred = pd.concat(oos_pred_parts) if oos_pred_parts else pd.Series(dtype=float)
 
-        is_overall = float(metric(pd.concat(all_ytr_parts), pd.concat(all_is_pred_parts))) \
-            if all_ytr_parts else float("nan")
-        oos_overall = float(metric(pd.concat(all_ytest_parts), oos_pred)) \
-            if all_ytest_parts else float("nan")
+        is_overall = (
+            float(metric(pd.concat(all_ytr_parts), pd.concat(all_is_pred_parts)))
+            if all_ytr_parts
+            else float("nan")
+        )
+        oos_overall = (
+            float(metric(pd.concat(all_ytest_parts), oos_pred)) if all_ytest_parts else float("nan")
+        )
 
         return WalkForwardResult(
             folds=splits,
@@ -196,4 +207,4 @@ class WalkForward:
         )
 
 
-__all__ = ["WalkForward", "WalkForwardSplit", "WalkForwardResult"]
+__all__ = ["WalkForward", "WalkForwardResult", "WalkForwardSplit"]

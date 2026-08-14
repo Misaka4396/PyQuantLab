@@ -12,12 +12,11 @@
 
 所有函数在网络不可用时回退合成数据，并在返回中注明 ``source``。
 """
+
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -26,7 +25,7 @@ from data import schemas as sc
 from data.data_loader import clean_ohlcv
 from etf.pcf_parser import PCFBasket
 
-DateLike = Union[str, pd.Timestamp]
+DateLike = str | pd.Timestamp
 
 # 折溢价列名
 COL_PREM_INTRADAY = "premium_intraday"
@@ -42,24 +41,27 @@ def fetch_etf_minute_akshare(
     end: str,
     period: str = "1",
     retries: int = 2,
-) -> Optional[pd.DataFrame]:
+) -> pd.DataFrame | None:
     """用 akshare 拉取 ETF 分钟行情（无 IOPV 列，IOPV 需另行合成/接入）。"""
     import akshare as ak
 
     for attempt in range(retries):
         try:
-            raw = ak.fund_etf_hist_min_em(symbol=code, period=period,
-                                          start_date=start, end_date=end, adjust="")
+            raw = ak.fund_etf_hist_min_em(
+                symbol=code, period=period, start_date=start, end_date=end, adjust=""
+            )
             if raw is None or raw.empty:
                 return None
-            df = pd.DataFrame({
-                sc.COL_OPEN: pd.to_numeric(raw["开盘"], errors="coerce"),
-                sc.COL_HIGH: pd.to_numeric(raw["最高"], errors="coerce"),
-                sc.COL_LOW: pd.to_numeric(raw["最低"], errors="coerce"),
-                sc.COL_CLOSE: pd.to_numeric(raw["收盘"], errors="coerce"),
-                sc.COL_VOLUME: pd.to_numeric(raw["成交量"], errors="coerce"),
-                sc.COL_AMOUNT: pd.to_numeric(raw["成交额"], errors="coerce"),
-            })
+            df = pd.DataFrame(
+                {
+                    sc.COL_OPEN: pd.to_numeric(raw["开盘"], errors="coerce"),
+                    sc.COL_HIGH: pd.to_numeric(raw["最高"], errors="coerce"),
+                    sc.COL_LOW: pd.to_numeric(raw["最低"], errors="coerce"),
+                    sc.COL_CLOSE: pd.to_numeric(raw["收盘"], errors="coerce"),
+                    sc.COL_VOLUME: pd.to_numeric(raw["成交量"], errors="coerce"),
+                    sc.COL_AMOUNT: pd.to_numeric(raw["成交额"], errors="coerce"),
+                }
+            )
             df.index = pd.to_datetime(raw["时间"])
             df.index.name = sc.COL_DATETIME
             df = df[~df.index.duplicated(keep="last")].sort_index()
@@ -107,29 +109,37 @@ def synthetic_etf_minute(
     # 合成 IOPV：围绕 ETF 价，模拟折溢价（约 ±10bp 内随机）
     iopv = close * (1 + rng.normal(0.0, 0.0003, len(idx)))
 
-    df = pd.DataFrame({
-        sc.COL_OPEN: open_,
-        sc.COL_HIGH: high,
-        sc.COL_LOW: low,
-        sc.COL_CLOSE: close,
-        sc.COL_VOLUME: volume,
-        sc.COL_AMOUNT: volume * close,
-        sc.COL_IOPV: iopv,
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            sc.COL_OPEN: open_,
+            sc.COL_HIGH: high,
+            sc.COL_LOW: low,
+            sc.COL_CLOSE: close,
+            sc.COL_VOLUME: volume,
+            sc.COL_AMOUNT: volume * close,
+            sc.COL_IOPV: iopv,
+        },
+        index=idx,
+    )
     df.index.name = sc.COL_DATETIME
     return df
 
 
-def synthetic_nav(code: str, dates: List[DateLike], seed: int = 2, base: float = 3.0) -> pd.DataFrame:
+def synthetic_nav(
+    code: str, dates: list[DateLike], seed: int = 2, base: float = 3.0
+) -> pd.DataFrame:
     """合成 NAV 日频序列（index=日期，列 nav/iopv 收盘参考）。"""
     rng = np.random.default_rng(seed)
     idx = pd.DatetimeIndex([pd.Timestamp(d) for d in dates])
     rets = rng.normal(0.0, 0.001, len(idx))
     nav = base * np.exp(np.cumsum(rets))
-    return pd.DataFrame({
-        sc.COL_NAV: nav,
-        sc.COL_IOPV: nav * (1 + rng.normal(0.0, 0.0002, len(idx))),
-    }, index=idx)
+    return pd.DataFrame(
+        {
+            sc.COL_NAV: nav,
+            sc.COL_IOPV: nav * (1 + rng.normal(0.0, 0.0002, len(idx))),
+        },
+        index=idx,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +166,7 @@ def premium_close(etf_close: pd.Series, nav: pd.Series) -> pd.Series:
 # ---------------------------------------------------------------------------
 def mark_untradeable_constituents(
     basket: PCFBasket,
-    quotes: Dict[str, pd.DataFrame],
+    quotes: dict[str, pd.DataFrame],
     limit_pct: float = 0.10,
 ) -> pd.DataFrame:
     """标记篮子成分股的可交易状态（停牌 / 涨跌停 / 无数据）。
@@ -168,16 +178,28 @@ def mark_untradeable_constituents(
     for c in basket.constituents:
         df = quotes.get(c.symbol)
         if df is None or len(df) == 0:
-            rows.append({"symbol": c.symbol, "is_suspended": True,
-                         "limit_status": "no_data", "tradeable": False})
+            rows.append(
+                {
+                    "symbol": c.symbol,
+                    "is_suspended": True,
+                    "limit_status": "no_data",
+                    "tradeable": False,
+                }
+            )
             continue
         cleaned = clean_ohlcv(df, limit_pct=limit_pct)
         last = cleaned.iloc[-1]
         is_susp = bool(last[sc.COL_IS_SUSPENDED])
         limit = str(last[sc.COL_LIMIT_STATUS])
         tradeable = bool((not is_susp) and (limit == sc.LIMIT_NORMAL))
-        rows.append({"symbol": c.symbol, "is_suspended": is_susp,
-                     "limit_status": limit, "tradeable": tradeable})
+        rows.append(
+            {
+                "symbol": c.symbol,
+                "is_suspended": is_susp,
+                "limit_status": limit,
+                "tradeable": tradeable,
+            }
+        )
     return pd.DataFrame(rows, columns=["symbol", "is_suspended", "limit_status", "tradeable"])
 
 
@@ -205,7 +227,8 @@ class ETFDataService:
         """
         if self.use_akshare:
             raw = fetch_etf_minute_akshare(
-                code, pd.Timestamp(start).strftime("%Y%m%d"),
+                code,
+                pd.Timestamp(start).strftime("%Y%m%d"),
                 pd.Timestamp(end).strftime("%Y%m%d"),
             )
             if raw is not None and not raw.empty:
@@ -216,7 +239,7 @@ class ETFDataService:
         df.attrs["source"] = "synthetic"
         return df
 
-    def load_nav(self, code: str, dates: List[DateLike]) -> pd.DataFrame:
+    def load_nav(self, code: str, dates: list[DateLike]) -> pd.DataFrame:
         """加载 NAV 日频序列（合成；akshare 免费源对 NAV 覆盖有限，注明合成）。"""
         df = synthetic_nav(code, dates, seed=self.seed + 1)
         df.attrs["source"] = "synthetic"
@@ -234,7 +257,11 @@ class ETFDataService:
         - premium_close：收盘折溢价（(ETF收盘-NAV)/NAV）
         """
         intraday = premium_intraday(quotes[sc.COL_CLOSE], quotes[sc.COL_IOPV])
-        intraday_daily = intraday.resample("D").mean().rename(COL_PREM_INTRADAY) if not intraday.empty else pd.Series(dtype=float)
+        intraday_daily = (
+            intraday.resample("D").mean().rename(COL_PREM_INTRADAY)
+            if not intraday.empty
+            else pd.Series(dtype=float)
+        )
 
         daily_close = quotes[sc.COL_CLOSE].resample("D").last()
         close_p = premium_close(daily_close, nav[sc.COL_NAV]).rename(COL_PREM_CLOSE)
@@ -245,13 +272,13 @@ class ETFDataService:
 
 
 __all__ = [
+    "COL_PREM_CLOSE",
+    "COL_PREM_INTRADAY",
     "ETFDataService",
     "fetch_etf_minute_akshare",
+    "mark_untradeable_constituents",
+    "premium_close",
+    "premium_intraday",
     "synthetic_etf_minute",
     "synthetic_nav",
-    "premium_intraday",
-    "premium_close",
-    "mark_untradeable_constituents",
-    "COL_PREM_INTRADAY",
-    "COL_PREM_CLOSE",
 ]

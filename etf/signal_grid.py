@@ -7,25 +7,25 @@
 - long（折价买入）：profit = exit_premium - entry_premium - unit_cost
 - short（溢价卖出）：profit = entry_premium - exit_premium - unit_cost
 """
+
 from __future__ import annotations
 
 import itertools
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Sequence
 
 import numpy as np
 import pandas as pd
 
 from etf.etf_signal import (
-    ETFSignalGenerator,
-    ACTION_OPEN,
     ACTION_CLOSE,
-    DIR_LONG,
-    DIR_SHORT,
-    COL_TS,
+    ACTION_OPEN,
     COL_ACTION,
     COL_DIRECTION,
     COL_PREMIUM,
+    COL_TS,
+    DIR_LONG,
+    ETFSignalGenerator,
 )
 from etf.threshold_config import ThresholdConfig
 
@@ -37,8 +37,13 @@ def evaluate_signals(signals: pd.DataFrame, unit_cost_rate: float) -> dict:
     返回 {n_trades, n_opens, n_closes, win_rate, total_return, avg_profit, sharpe}。
     """
     empty = {
-        "n_trades": 0, "n_opens": 0, "n_closes": 0,
-        "win_rate": 0.0, "total_return": 0.0, "avg_profit": 0.0, "sharpe": 0.0,
+        "n_trades": 0,
+        "n_opens": 0,
+        "n_closes": 0,
+        "win_rate": 0.0,
+        "total_return": 0.0,
+        "avg_profit": 0.0,
+        "sharpe": 0.0,
     }
     if signals is None or len(signals) == 0:
         return empty
@@ -66,7 +71,7 @@ def evaluate_signals(signals: pd.DataFrame, unit_cost_rate: float) -> dict:
     arr = np.asarray(trades, dtype=float)
     wins = arr[arr > 0]
     return {
-        "n_trades": int(len(arr)),
+        "n_trades": len(arr),
         "n_opens": n_opens,
         "n_closes": n_closes,
         "win_rate": float(len(wins) / len(arr)),
@@ -81,19 +86,19 @@ class GridResult:
     """网格寻优结果。"""
 
     param_table: pd.DataFrame = field(default_factory=pd.DataFrame)  # 各参数组合 + IS 指标
-    best_params: Dict = field(default_factory=dict)                  # 样本内最优参数
-    best_is_metrics: Dict = field(default_factory=dict)              # 最优参数 IS 指标
-    oos_metrics: Dict = field(default_factory=dict)                  # 最优参数 OOS 指标（只评估一次）
-    is_overfit_risk: bool = False                                    # OOS 相对 IS 是否显著衰减
+    best_params: dict = field(default_factory=dict)  # 样本内最优参数
+    best_is_metrics: dict = field(default_factory=dict)  # 最优参数 IS 指标
+    oos_metrics: dict = field(default_factory=dict)  # 最优参数 OOS 指标（只评估一次）
+    is_overfit_risk: bool = False  # OOS 相对 IS 是否显著衰减
     note: str = ""
 
 
 def grid_search(
     premium: pd.Series,
     unit_cost_rate: float,
-    base_config: Optional[ThresholdConfig] = None,
+    base_config: ThresholdConfig | None = None,
     split_ratio: float = 0.7,
-    grid: Optional[Dict[str, Sequence]] = None,
+    grid: dict[str, Sequence] | None = None,
 ) -> GridResult:
     """样本内网格寻优 + 样本外一次验证。
 
@@ -120,10 +125,10 @@ def grid_search(
     combos = list(itertools.product(*[grid[k] for k in keys]))
 
     rows = []
-    best_params: Optional[dict] = None
+    best_params: dict | None = None
     best_score = -np.inf
     for combo in combos:
-        params = dict(zip(keys, combo))
+        params = dict(zip(keys, combo, strict=False))
         cfg = ThresholdConfig(**{**base.__dict__, **params})
         try:
             cfg.validate()
@@ -152,9 +157,9 @@ def grid_search(
     is_overfit = (oos_total < 0) or (is_total > 0 and oos_total < 0.5 * is_total)
 
     note = (
-        "网格只在样本内(前 {:.0%})寻优，样本外仅对最优参数评估一次；"
+        f"网格只在样本内(前 {split_ratio:.0%})寻优，样本外仅对最优参数评估一次；"
         "若 OOS 显著弱于 IS，说明参数过拟合，应扩大样本、减少网格维度或做 C4 过拟合检测。"
-    ).format(split_ratio)
+    )
 
     return GridResult(
         param_table=table,
@@ -166,4 +171,4 @@ def grid_search(
     )
 
 
-__all__ = ["evaluate_signals", "grid_search", "GridResult"]
+__all__ = ["GridResult", "evaluate_signals", "grid_search"]

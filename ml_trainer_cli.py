@@ -13,14 +13,15 @@
 - registry 模型版本管理（list / rollback）
 - overfit  过拟合检测报告（DSR / PBO / OOS-IS 对比，输出 markdown）
 """
+
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from ml.overfit import assess_overfitting
@@ -82,10 +83,12 @@ def cmd_train(args: argparse.Namespace) -> int:
         dl_epochs=args.epochs,
         model_dir=args.out,
     )
-    print(f"[train] 样本={len(X)} 特征={len(feat_cols)} 模型={args.model} 任务={args.task} 种子={args.seed}")
+    print(
+        f"[train] 样本={len(X)} 特征={len(feat_cols)} 模型={args.model} 任务={args.task} 种子={args.seed}"
+    )
     result = train(cfg, X, y, times=times)
     print("[train] 完成。模型版本:")
-    for m, v in zip(result.get("models", []), result.get("versions", [])):
+    for m, v in zip(result.get("models", []), result.get("versions", []), strict=False):
         name = m if isinstance(m, str) else type(m).__name__
         print(f"  - {name} v{v}")
     print(f"[train] 模型目录: {args.out}")
@@ -108,9 +111,9 @@ def cmd_registry(args: argparse.Namespace) -> int:
         for ver in sorted(versions, key=int):
             rec = versions[ver]
             print(
-                f"  v{ver}  {rec.get('model_type','?'):<20} task={rec.get('task','?'):<15} "
-                f"data_v={rec.get('data_version','?')} feat_v={rec.get('feature_version','?')} "
-                f"seed={rec.get('seed','?')} metrics={json.dumps(rec.get('metrics',{}), ensure_ascii=False)}"
+                f"  v{ver}  {rec.get('model_type', '?'):<20} task={rec.get('task', '?'):<15} "
+                f"data_v={rec.get('data_version', '?')} feat_v={rec.get('feature_version', '?')} "
+                f"seed={rec.get('seed', '?')} metrics={json.dumps(rec.get('metrics', {}), ensure_ascii=False)}"
             )
         print(f"[registry] 当前版本: {index.get('current_version')}")
         return 0
@@ -138,8 +141,11 @@ def cmd_overfit(args: argparse.Namespace) -> int:
     )
     out_path = generate_overfit_report(assessment, args.out, name=args.name)
     print(f"[overfit] 风险等级: {assessment.risk_level} | 上线建议: {assessment.recommendation}")
-    for key, val in (("DSR", assessment.dsr), ("PBO", assessment.pbo),
-                     ("OOS/IS Sharpe衰减", assessment.sharpe_degradation)):
+    for key, val in (
+        ("DSR", assessment.dsr),
+        ("PBO", assessment.pbo),
+        ("OOS/IS Sharpe衰减", assessment.sharpe_degradation),
+    ):
         print(f"[overfit] {key} = {val:.4f}" if val is not None else f"[overfit] {key} = —")
     print(f"[overfit] 报告已生成: {out_path}")
     return 0
@@ -154,7 +160,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     tr = sub.add_parser("train", help="训练模型（LightGBM / LSTM / Transformer）")
     tr.add_argument("--data", required=True, help="特征数据 parquet/csv")
-    tr.add_argument("--features", nargs="*", default=None, help="特征列（默认除 label/time 外全部）")
+    tr.add_argument(
+        "--features", nargs="*", default=None, help="特征列（默认除 label/time 外全部）"
+    )
     tr.add_argument("--label", default=None, help="标签列")
     tr.add_argument("--time", default=None, help="时间列")
     tr.add_argument("--model", choices=["lgb", "lstm", "transformer", "all"], default="lgb")
@@ -185,14 +193,12 @@ def main(argv=None) -> int:
     # Windows 控制台 UTF-8 输出（避免中文乱码）
     for stream in (sys.stdout, sys.stderr):
         if stream and hasattr(stream, "reconfigure"):
-            try:
+            with contextlib.suppress(Exception):
                 stream.reconfigure(encoding="utf-8")
-            except Exception:
-                pass
     args = build_parser().parse_args(argv)
     try:
         return args.func(args)
-    except Exception as e:  # noqa: BLE001 - CLI 顶层错误捕获
+    except Exception as e:
         print(f"[错误] {type(e).__name__}: {e}", file=sys.stderr)
         return 1
 

@@ -1,4 +1,5 @@
 """pytest 全局配置：把仓库根目录加入 sys.path，保证 data/core/config 可导入。"""
+
 import sys
 from pathlib import Path
 

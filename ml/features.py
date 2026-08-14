@@ -10,12 +10,13 @@
 
 每个特征的"可用时点"见 ``ml/features_schema.md``。
 """
+
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -67,12 +68,15 @@ def build_labels(prices: pd.Series, horizon: int) -> pd.DataFrame:
     idx_series = pd.Series(close.index, index=close.index)
     label_asof = idx_series.shift(-horizon)
 
-    df = pd.DataFrame({
-        LABEL_FWD_RETURN: fwd_return,
-        LABEL_FWD_DIRECTION: fwd_direction,
-        LABEL_FWD_VOLATILITY: fwd_volatility,
-        LABEL_ASOF: label_asof,
-    }, index=close.index)
+    df = pd.DataFrame(
+        {
+            LABEL_FWD_RETURN: fwd_return,
+            LABEL_FWD_DIRECTION: fwd_direction,
+            LABEL_FWD_VOLATILITY: fwd_volatility,
+            LABEL_ASOF: label_asof,
+        },
+        index=close.index,
+    )
     df.attrs["horizon"] = int(horizon)
     return df
 
@@ -103,7 +107,9 @@ def build_features(
     open_ = pd.to_numeric(df[sc.COL_OPEN], errors="coerce")
     high = pd.to_numeric(df[sc.COL_HIGH], errors="coerce")
     low = pd.to_numeric(df[sc.COL_LOW], errors="coerce")
-    volume = pd.to_numeric(df.get(sc.COL_VOLUME, pd.Series(np.nan, index=df.index)), errors="coerce")
+    volume = pd.to_numeric(
+        df.get(sc.COL_VOLUME, pd.Series(np.nan, index=df.index)), errors="coerce"
+    )
     ret = close.pct_change(fill_method=None)
 
     out = pd.DataFrame(index=df.index)
@@ -129,7 +135,7 @@ def build_features(
 def rolling_standardize(
     df: pd.DataFrame,
     window: int,
-    columns: Optional[Sequence[str]] = None,
+    columns: Sequence[str] | None = None,
 ) -> pd.DataFrame:
     """滚动标准化：z_t = (x_t - mean(x_{t-w+1..t})) / std(x_{t-w+1..t})。
 
@@ -149,7 +155,7 @@ def clip_rolling(
     df: pd.DataFrame,
     window: int,
     n_std: float = 3.0,
-    columns: Optional[Sequence[str]] = None,
+    columns: Sequence[str] | None = None,
 ) -> pd.DataFrame:
     """point-in-time 异常值裁剪：以滚动均值 ± n_std*滚动标准差为界 clip（无前视）。"""
     cols = list(columns) if columns is not None else list(df.columns)
@@ -168,7 +174,7 @@ def winsorize(
     df: pd.DataFrame,
     lower_quantile: float = 0.01,
     upper_quantile: float = 0.99,
-    columns: Optional[Sequence[str]] = None,
+    columns: Sequence[str] | None = None,
 ) -> pd.DataFrame:
     """全样本分位裁剪（Winsorize）。
 
@@ -200,7 +206,7 @@ def encode_categorical(
     df: pd.DataFrame,
     column: str,
     drop_first: bool = False,
-    prefix: Optional[str] = None,
+    prefix: str | None = None,
 ) -> pd.DataFrame:
     """类别编码（one-hot）。"""
     dummies = pd.get_dummies(df[column], prefix=prefix or column, drop_first=drop_first)
@@ -213,15 +219,14 @@ def encode_categorical(
 def assemble(
     ohlcv: pd.DataFrame,
     horizon: int,
-    standardize_window: Optional[int] = None,
+    standardize_window: int | None = None,
     momentum_windows: Sequence[int] = (5, 20),
     volatility_windows: Sequence[int] = (10, 20),
     volume_windows: Sequence[int] = (5, 20),
     ma_windows: Sequence[int] = (5, 20),
 ) -> pd.DataFrame:
     """端到端组装特征 + 标签（内连接对齐，可选滚动标准化）。"""
-    feats = build_features(ohlcv, momentum_windows, volatility_windows,
-                           volume_windows, ma_windows)
+    feats = build_features(ohlcv, momentum_windows, volatility_windows, volume_windows, ma_windows)
     labels = build_labels(ohlcv[sc.COL_CLOSE], horizon)
     if standardize_window is not None:
         feats = rolling_standardize(feats, standardize_window)
@@ -238,7 +243,7 @@ def assemble(
 class FeatureStore:
     """特征集版本化存储：root/{name}/v{version}.parquet + _meta.json。"""
 
-    root: Union[str, Path] = DEFAULT_FEATURE_ROOT
+    root: str | Path = DEFAULT_FEATURE_ROOT
 
     def __post_init__(self):
         self.root = Path(self.root)
@@ -261,7 +266,9 @@ class FeatureStore:
             "index_name": str(df.index.name),
             "saved_at": pd.Timestamp.now().isoformat(),
         }
-        (d / "_meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+        (d / "_meta.json").write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         return path
 
     def load(self, name: str, version: int) -> pd.DataFrame:
@@ -271,7 +278,7 @@ class FeatureStore:
             raise FileNotFoundError(f"特征集不存在: {path}")
         return pd.read_parquet(path)
 
-    def latest_version(self, name: str) -> Optional[int]:
+    def latest_version(self, name: str) -> int | None:
         """返回某特征集的最新版本号（无则 None）。"""
         d = self.root / name
         if not d.exists():
@@ -281,17 +288,17 @@ class FeatureStore:
 
 
 __all__ = [
-    "build_labels",
-    "build_features",
-    "rolling_standardize",
-    "clip_rolling",
-    "winsorize",
-    "fill_missing",
-    "encode_categorical",
-    "assemble",
-    "FeatureStore",
-    "LABEL_FWD_RETURN",
-    "LABEL_FWD_DIRECTION",
-    "LABEL_FWD_VOLATILITY",
     "LABEL_ASOF",
+    "LABEL_FWD_DIRECTION",
+    "LABEL_FWD_RETURN",
+    "LABEL_FWD_VOLATILITY",
+    "FeatureStore",
+    "assemble",
+    "build_features",
+    "build_labels",
+    "clip_rolling",
+    "encode_categorical",
+    "fill_missing",
+    "rolling_standardize",
+    "winsorize",
 ]

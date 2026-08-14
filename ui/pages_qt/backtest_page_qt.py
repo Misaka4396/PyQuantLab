@@ -18,7 +18,6 @@ from PyQt5.QtWidgets import (
 )
 
 from backtest.engine import BacktestEngine
-from backtest.report import BacktestReport
 from core.types import BacktestConfig
 from strategy.registry import registry
 from ui.charts_qt import equity_curve_chart
@@ -135,13 +134,14 @@ class BacktestPage(QWidget):
 
     def on_activated(self):
         from PyQt5.QtWidgets import QApplication
+
         for w in QApplication.instance().allWidgets():
-            if hasattr(w, 'nav_list'):
+            if hasattr(w, "nav_list"):
                 dp = w.pages[1]
-                if hasattr(dp, 'data') and dp.data is not None:
+                if hasattr(dp, "data") and dp.data is not None:
                     self.data = dp.data
                 sp = w.pages[2]
-                if hasattr(sp, 'strategy_combo'):
+                if hasattr(sp, "strategy_combo"):
                     idx = self.strategy_combo.findText(sp.strategy_combo.currentText())
                     if idx >= 0:
                         self.strategy_combo.setCurrentIndex(idx)
@@ -176,14 +176,15 @@ class BacktestPage(QWidget):
             return {name: engine.run(self.data, strategy)}
 
         self._thread = run_in_thread(
-            self, _compute,
+            self,
+            _compute,
             on_finished=self._on_single_done,
             on_error=lambda e: self._set_buttons_enabled(True),
         )
 
     def _on_single_done(self, results):
         self.results = results
-        name = list(results.keys())[0]
+        name = next(iter(results.keys()))
         self._display_result(results[name])
         self._update_comparison_table()
         self._set_buttons_enabled(True)
@@ -205,7 +206,8 @@ class BacktestPage(QWidget):
             return results
 
         self._thread = run_in_thread(
-            self, _compute,
+            self,
+            _compute,
             on_finished=self._on_compare_done,
             on_error=lambda e: self._set_buttons_enabled(True),
         )
@@ -220,10 +222,11 @@ class BacktestPage(QWidget):
 
     def _get_strategy_params_from_ui(self, name: str) -> dict:
         from PyQt5.QtWidgets import QApplication
+
         for w in QApplication.instance().allWidgets():
-            if hasattr(w, 'nav_list'):
+            if hasattr(w, "nav_list"):
                 sp = w.pages[2]
-                if hasattr(sp, '_get_current_params'):
+                if hasattr(sp, "_get_current_params"):
                     return sp._get_current_params()
         spec = registry.get_param_spec(name)
         return {k: v["default"] for k, v in spec.items()}
@@ -238,7 +241,7 @@ class BacktestPage(QWidget):
             f"{m.win_rate * 100:.1f}%",
             str(m.total_trades),
         ]
-        for label, val in zip(self.kpi_labels.keys(), values):
+        for label, val in zip(self.kpi_labels.keys(), values, strict=False):
             self.kpi_labels[label].setText(val)
 
         while self.chart_layout.count():
@@ -260,8 +263,12 @@ class BacktestPage(QWidget):
         for row, (name, r) in enumerate(self.results.items()):
             m = r.metrics
             vals = [
-                name, f"{m.total_return*100:.2f}%", f"{m.sharpe_ratio:.2f}",
-                f"{m.max_drawdown*100:.2f}%", f"{m.win_rate*100:.1f}%", str(m.total_trades),
+                name,
+                f"{m.total_return * 100:.2f}%",
+                f"{m.sharpe_ratio:.2f}",
+                f"{m.max_drawdown * 100:.2f}%",
+                f"{m.win_rate * 100:.1f}%",
+                str(m.total_trades),
             ]
             for col, v in enumerate(vals):
                 item = QTableWidgetItem(v)

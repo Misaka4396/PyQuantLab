@@ -1,12 +1,10 @@
 """Page 4: Results & Risk Analysis — detailed performance breakdown."""
 
-import pandas as pd
 import streamlit as st
 
 from backtest.report import BacktestReport
 from backtest.risk import RiskAnalyzer
 from ui.components.charts import (
-    correlation_heatmap_chart,
     equity_curve_chart,
     monthly_returns_heatmap,
     returns_distribution,
@@ -27,10 +25,16 @@ def render() -> None:
     report = BacktestReport(result)
     returns = result.equity_curve["returns"]
 
-    tabs = st.tabs([
-        "Overview", "Equity Curve", "Drawdown Analysis",
-        "Trade Analysis", "Risk Metrics", "Monthly Returns",
-    ])
+    tabs = st.tabs(
+        [
+            "Overview",
+            "Equity Curve",
+            "Drawdown Analysis",
+            "Trade Analysis",
+            "Risk Metrics",
+            "Monthly Returns",
+        ]
+    )
 
     with tabs[0]:
         st.subheader("Performance Summary")
@@ -55,14 +59,18 @@ def render() -> None:
         dd_df = RiskAnalyzer.drawdown_analysis(result.equity_curve["equity"])
         if not dd_df.empty:
             st.dataframe(
-                dd_df.style.format({
-                    "max_drawdown": "{:.2%}",
-                    "recovery": "{:.2%}",
-                }),
+                dd_df.style.format(
+                    {
+                        "max_drawdown": "{:.2%}",
+                        "recovery": "{:.2%}",
+                    }
+                ),
                 use_container_width=True,
             )
-            st.caption(f"**Maximum Drawdown:** {m.max_drawdown * 100:.2f}% | "
-                       f"**Longest DD Period:** {m.max_drawdown_duration} days")
+            st.caption(
+                f"**Maximum Drawdown:** {m.max_drawdown * 100:.2f}% | "
+                f"**Longest DD Period:** {m.max_drawdown_duration} days"
+            )
         else:
             st.info("No drawdown periods detected.")
 
@@ -91,9 +99,7 @@ def render() -> None:
             display_trades = trades.copy()
             for col in ["pnl_pct"]:
                 if col in display_trades.columns:
-                    display_trades[col] = display_trades[col].apply(
-                        lambda x: f"{x * 100:.2f}%"
-                    )
+                    display_trades[col] = display_trades[col].apply(lambda x: f"{x * 100:.2f}%")
             st.dataframe(display_trades, use_container_width=True)
         else:
             st.info("No trades were executed during this backtest.")
@@ -112,7 +118,8 @@ def render() -> None:
         stress_df = RiskAnalyzer.stress_test(returns)
         st.dataframe(
             stress_df.style.format({"shock": "{:.0%}", "total_return": "{:.2%}"}),
-            use_container_width=True, hide_index=True,
+            use_container_width=True,
+            hide_index=True,
         )
 
         st.divider()

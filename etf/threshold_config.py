@@ -6,19 +6,19 @@
 
 所有默认值均为可调的初始估计，上线前应与实盘成本（券商费率、实际滑点）对账。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 
 # 平仓原因
-EXIT_MEAN_REVERT = "mean_revert"   # 均值回归 / 归零平仓
-EXIT_STOP_LOSS = "stop_loss"       # 止损平仓
-EXIT_FORCE_CLOSE = "force_close"   # 收盘前强制平仓
+EXIT_MEAN_REVERT = "mean_revert"  # 均值回归 / 归零平仓
+EXIT_STOP_LOSS = "stop_loss"  # 止损平仓
+EXIT_FORCE_CLOSE = "force_close"  # 收盘前强制平仓
 
 # 套利方向
-DIR_LONG = "long"     # 折价 → 买 ETF、卖篮子（ETF 腿 = BUY）
-DIR_SHORT = "short"   # 溢价 → 卖 ETF、买篮子（ETF 腿 = SELL）
+DIR_LONG = "long"  # 折价 → 买 ETF、卖篮子（ETF 腿 = BUY）
+DIR_SHORT = "short"  # 溢价 → 卖 ETF、买篮子（ETF 腿 = SELL）
 
 
 @dataclass
@@ -28,30 +28,30 @@ class ThresholdConfig:
     # ------------------------------------------------------------------
     # 滚动窗口与开仓判据
     # ------------------------------------------------------------------
-    zscore_window: int = 60           # 滚动 z-score / 分位数窗口（bar 数，只用窗口内数据）
-    use_quantile: bool = True         # True=分位数判据；False=z-score 判据
-    zscore_entry: float = 2.0         # 开仓 z-score 阈值（|z| >= 该值）
-    quantile_entry: float = 0.95      # 开仓分位数阈值（上侧 >=；下侧 <= 1 - 该值）
-    entry_buffer: float = 0.0005      # 开仓缓冲：溢价幅度需 > 单位成本 + 缓冲
+    zscore_window: int = 60  # 滚动 z-score / 分位数窗口（bar 数，只用窗口内数据）
+    use_quantile: bool = True  # True=分位数判据；False=z-score 判据
+    zscore_entry: float = 2.0  # 开仓 z-score 阈值（|z| >= 该值）
+    quantile_entry: float = 0.95  # 开仓分位数阈值（上侧 >=；下侧 <= 1 - 该值）
+    entry_buffer: float = 0.0005  # 开仓缓冲：溢价幅度需 > 单位成本 + 缓冲
 
     # ------------------------------------------------------------------
     # 平仓规则
     # ------------------------------------------------------------------
-    zscore_exit: float = 0.0          # 均值回归平仓阈值：|z| 回落到该值即平仓（0=归零平仓）
-    stop_loss_bp: float = 30.0        # 止损（bp）：溢价朝不利方向扩大该幅度即平仓
-    force_close_time: str = "14:45"   # 收盘前强制平仓时点（HH:MM，盘中分钟数据用）
+    zscore_exit: float = 0.0  # 均值回归平仓阈值：|z| 回落到该值即平仓（0=归零平仓）
+    stop_loss_bp: float = 30.0  # 止损（bp）：溢价朝不利方向扩大该幅度即平仓
+    force_close_time: str = "14:45"  # 收盘前强制平仓时点（HH:MM，盘中分钟数据用）
 
     # ------------------------------------------------------------------
     # 风控
     # ------------------------------------------------------------------
-    min_holding_minutes: int = 5      # 最小持仓时长（分钟），防止同 bar 反复开平
+    min_holding_minutes: int = 5  # 最小持仓时长（分钟），防止同 bar 反复开平
 
     # ------------------------------------------------------------------
     # 网格寻优范围（signal_grid.py 使用，仅限样本内寻优，禁止全样本）
     # ------------------------------------------------------------------
-    grid_zscore_entry: Tuple[float, ...] = (1.5, 2.0, 2.5, 3.0)
-    grid_entry_buffer: Tuple[float, ...] = (0.0003, 0.0005, 0.0010)
-    grid_stop_loss_bp: Tuple[float, ...] = (20.0, 30.0, 40.0)
+    grid_zscore_entry: tuple[float, ...] = (1.5, 2.0, 2.5, 3.0)
+    grid_entry_buffer: tuple[float, ...] = (0.0003, 0.0005, 0.0010)
+    grid_stop_loss_bp: tuple[float, ...] = (20.0, 30.0, 40.0)
 
     def validate(self) -> None:
         """校验参数合法性，非法直接抛 ValueError。"""
@@ -71,7 +71,7 @@ class ThresholdConfig:
         if not (0 <= hh < 24 and 0 <= mm < 60):
             raise ValueError(f"force_close_time 非法: {self.force_close_time!r}")
 
-    def _parse_force_close(self) -> Tuple[int, int]:
+    def _parse_force_close(self) -> tuple[int, int]:
         parts = str(self.force_close_time).split(":")
         if len(parts) != 2:
             raise ValueError(f"force_close_time 需为 HH:MM，得到 {self.force_close_time!r}")
@@ -84,10 +84,10 @@ class ThresholdConfig:
 
 
 __all__ = [
-    "ThresholdConfig",
-    "EXIT_MEAN_REVERT",
-    "EXIT_STOP_LOSS",
-    "EXIT_FORCE_CLOSE",
     "DIR_LONG",
     "DIR_SHORT",
+    "EXIT_FORCE_CLOSE",
+    "EXIT_MEAN_REVERT",
+    "EXIT_STOP_LOSS",
+    "ThresholdConfig",
 ]

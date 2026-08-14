@@ -12,10 +12,8 @@
 输出：开/平仓信号事件流 DataFrame（字段含 ts/action/direction/threshold_basis），
 并附 ``signal_to_engine_events`` 把一行信号转换为 A2 引擎的 ``SignalEvent`` 列表。
 """
-from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -23,12 +21,9 @@ import pandas as pd
 from cost_model import CostModel
 from engine.events import BUY, SELL, SignalEvent
 from etf.threshold_config import (
-    ThresholdConfig,
     DIR_LONG,
     DIR_SHORT,
-    EXIT_MEAN_REVERT,
-    EXIT_STOP_LOSS,
-    EXIT_FORCE_CLOSE,
+    ThresholdConfig,
 )
 
 # 输出事件列名
@@ -47,8 +42,16 @@ ACTION_OPEN = "open"
 ACTION_CLOSE = "close"
 
 _EVENT_COLUMNS = [
-    COL_TS, COL_ACTION, COL_DIRECTION, COL_ETF_SIDE, COL_PREMIUM,
-    COL_ZSCORE, COL_QUANTILE, COL_ENTRY_THRESHOLD, COL_REASON, COL_STOP_LEVEL,
+    COL_TS,
+    COL_ACTION,
+    COL_DIRECTION,
+    COL_ETF_SIDE,
+    COL_PREMIUM,
+    COL_ZSCORE,
+    COL_QUANTILE,
+    COL_ENTRY_THRESHOLD,
+    COL_REASON,
+    COL_STOP_LEVEL,
 ]
 
 
@@ -102,17 +105,15 @@ class ETFSignalGenerator:
 
     def __init__(
         self,
-        config: Optional[ThresholdConfig] = None,
-        cost_model: Optional[CostModel] = None,
-        unit_cost_rate: Optional[float] = None,
+        config: ThresholdConfig | None = None,
+        cost_model: CostModel | None = None,
+        unit_cost_rate: float | None = None,
     ):
         self.config = config or ThresholdConfig()
         self.config.validate()
         if unit_cost_rate is None:
             model = cost_model or CostModel()
-            unit_cost_rate = round_trip_cost_rate(
-                model, price=3.0, quantity=10000, is_etf=True
-            )
+            unit_cost_rate = round_trip_cost_rate(model, price=3.0, quantity=10000, is_etf=True)
         self.unit_cost_rate = float(unit_cost_rate)
         self.threshold = entry_threshold(self.config, self.unit_cost_rate)
 
@@ -131,12 +132,12 @@ class ETFSignalGenerator:
         z = rolling_zscore(x, cfg.zscore_window)
         q = rolling_quantile(x, cfg.zscore_window)
 
-        events: List[dict] = []
-        position: Optional[dict] = None  # {direction, entry_ts, entry_premium}
+        events: list[dict] = []
+        position: dict | None = None  # {direction, entry_ts, entry_premium}
         force_close_min = cfg.force_close_minute_of_day()
         min_hold = pd.Timedelta(minutes=cfg.min_holding_minutes)
 
-        for ts, prem, zs, qt in zip(x.index, x.values, z.values, q.values):
+        for ts, prem, zs, qt in zip(x.index, x.values, z.values, q.values, strict=False):
             if not np.isfinite(prem) or not np.isfinite(zs) or not np.isfinite(qt):
                 continue  # 数据不足（warmup / 缺失），不产生信号
 
@@ -153,19 +154,19 @@ class ETFSignalGenerator:
                         "entry_ts": ts,
                         "entry_premium": prem,
                     }
-                    events.append(self._make_event(
-                        ts, ACTION_OPEN, direction, prem, zs, qt, basis, position=None
-                    ))
+                    events.append(
+                        self._make_event(
+                            ts, ACTION_OPEN, direction, prem, zs, qt, basis, position=None
+                        )
+                    )
             else:
                 direction = position["direction"]
                 stop_level = self._stop_level(position)
-                hit_stop = (
-                    (direction == DIR_LONG and prem <= stop_level)
-                    or (direction == DIR_SHORT and prem >= stop_level)
+                hit_stop = (direction == DIR_LONG and prem <= stop_level) or (
+                    direction == DIR_SHORT and prem >= stop_level
                 )
-                reverted = (
-                    (direction == DIR_LONG and zs >= cfg.zscore_exit)
-                    or (direction == DIR_SHORT and zs <= -cfg.zscore_exit)
+                reverted = (direction == DIR_LONG and zs >= cfg.zscore_exit) or (
+                    direction == DIR_SHORT and zs <= -cfg.zscore_exit
                 )
                 holding_ok = (ts - position["entry_ts"]) >= min_hold
 
@@ -179,9 +180,11 @@ class ETFSignalGenerator:
                     reason = None
 
                 if reason is not None:
-                    events.append(self._make_event(
-                        ts, ACTION_CLOSE, direction, prem, zs, qt, reason, position=position
-                    ))
+                    events.append(
+                        self._make_event(
+                            ts, ACTION_CLOSE, direction, prem, zs, qt, reason, position=position
+                        )
+                    )
                     position = None
 
         out = pd.DataFrame(events, columns=_EVENT_COLUMNS)
@@ -202,17 +205,24 @@ class ETFSignalGenerator:
             else:
                 cond, desc = zs >= cfg.zscore_entry, f"z>={cfg.zscore_entry:.2f}"
             if cond:
-                basis = (f"开仓:溢价{prem:.5f}>=阈值{self.threshold:.5f}"
-                         f"(成本{self.unit_cost_rate:.5f}+缓冲{cfg.entry_buffer:.5f}) 且 {desc}")
+                basis = (
+                    f"开仓:溢价{prem:.5f}>=阈值{self.threshold:.5f}"
+                    f"(成本{self.unit_cost_rate:.5f}+缓冲{cfg.entry_buffer:.5f}) 且 {desc}"
+                )
                 return DIR_SHORT, basis
         elif prem <= -self.threshold:
             if cfg.use_quantile:
-                cond, desc = qt <= 1.0 - cfg.quantile_entry, f"分位数<={1.0 - cfg.quantile_entry:.2f}"
+                cond, desc = (
+                    qt <= 1.0 - cfg.quantile_entry,
+                    f"分位数<={1.0 - cfg.quantile_entry:.2f}",
+                )
             else:
                 cond, desc = zs <= -cfg.zscore_entry, f"z<={-cfg.zscore_entry:.2f}"
             if cond:
-                basis = (f"开仓:折价{prem:.5f}<=-阈值{-self.threshold:.5f}"
-                         f"(成本{self.unit_cost_rate:.5f}+缓冲{cfg.entry_buffer:.5f}) 且 {desc}")
+                basis = (
+                    f"开仓:折价{prem:.5f}<=-阈值{-self.threshold:.5f}"
+                    f"(成本{self.unit_cost_rate:.5f}+缓冲{cfg.entry_buffer:.5f}) 且 {desc}"
+                )
                 return DIR_LONG, basis
         return None, None
 
@@ -232,7 +242,7 @@ class ETFSignalGenerator:
         zs: float,
         qt: float,
         reason: str,
-        position: Optional[dict],
+        position: dict | None,
     ) -> dict:
         etf_side = SELL if direction == DIR_SHORT else BUY
         return {
@@ -253,8 +263,8 @@ def signal_to_engine_events(
     row,
     etf_symbol: str,
     quantity: float,
-    basket: Optional[Dict[str, float]] = None,
-) -> List[SignalEvent]:
+    basket: dict[str, float] | None = None,
+) -> list[SignalEvent]:
     """把一行信号事件转换为 A2 引擎的 ``SignalEvent`` 列表（可被 EventEngine 消费）。
 
     - 开仓 long（折价）：买 ETF（BUY），卖篮子成分（SELL）。
@@ -274,32 +284,44 @@ def signal_to_engine_events(
         etf_side = BUY if direction == DIR_SHORT else SELL
         basket_side = SELL if direction == DIR_SHORT else BUY
 
-    events = [SignalEvent(
-        timestamp=ts, symbol=etf_symbol, side=etf_side,
-        quantity=float(quantity), order_type="market", reason=reason,
-    )]
+    events = [
+        SignalEvent(
+            timestamp=ts,
+            symbol=etf_symbol,
+            side=etf_side,
+            quantity=float(quantity),
+            order_type="market",
+            reason=reason,
+        )
+    ]
     if basket:
         for sym, qty in basket.items():
-            events.append(SignalEvent(
-                timestamp=ts, symbol=str(sym), side=basket_side,
-                quantity=float(qty), order_type="market", reason=reason,
-            ))
+            events.append(
+                SignalEvent(
+                    timestamp=ts,
+                    symbol=str(sym),
+                    side=basket_side,
+                    quantity=float(qty),
+                    order_type="market",
+                    reason=reason,
+                )
+            )
     return events
 
 
 __all__ = [
-    "ETFSignalGenerator",
-    "rolling_zscore",
-    "rolling_quantile",
-    "entry_threshold",
-    "round_trip_cost_rate",
-    "signal_to_engine_events",
-    "ACTION_OPEN",
     "ACTION_CLOSE",
-    "DIR_LONG",
-    "DIR_SHORT",
-    "COL_TS",
+    "ACTION_OPEN",
     "COL_ACTION",
     "COL_DIRECTION",
     "COL_REASON",
+    "COL_TS",
+    "DIR_LONG",
+    "DIR_SHORT",
+    "ETFSignalGenerator",
+    "entry_threshold",
+    "rolling_quantile",
+    "rolling_zscore",
+    "round_trip_cost_rate",
+    "signal_to_engine_events",
 ]

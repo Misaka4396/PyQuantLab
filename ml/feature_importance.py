@@ -8,9 +8,8 @@
 López de Prado (2018) *Advances in Financial Machine Learning* 第 8 章特征重要性
 相关讨论。
 """
-from __future__ import annotations
 
-from typing import List, Optional, Union
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -38,7 +37,7 @@ def to_rank_series(importance) -> pd.Series:
 
 
 def feature_importance_stability(
-    importances: List,
+    importances: list,
     method: str = "spearman",
 ) -> dict:
     """跨 fold 特征重要性稳定性分析。
@@ -70,11 +69,17 @@ def feature_importance_stability(
     stability_score = float(max(0.0, min(1.0, mean_corr)))
 
     rank_std = mat.std(axis=1)
-    feature_stats = pd.DataFrame({
-        "feature": all_features,
-        "mean_rank": mat.mean(axis=1).to_numpy(),
-        "rank_std": rank_std.to_numpy(),
-    }).sort_values("mean_rank").reset_index(drop=True)
+    feature_stats = (
+        pd.DataFrame(
+            {
+                "feature": all_features,
+                "mean_rank": mat.mean(axis=1).to_numpy(),
+                "rank_std": rank_std.to_numpy(),
+            }
+        )
+        .sort_values("mean_rank")
+        .reset_index(drop=True)
+    )
 
     return {
         "mean_correlation": mean_corr,
@@ -86,6 +91,6 @@ def feature_importance_stability(
 
 
 __all__ = [
-    "to_rank_series",
     "feature_importance_stability",
+    "to_rank_series",
 ]

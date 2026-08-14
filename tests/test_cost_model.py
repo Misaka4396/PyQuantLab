@@ -7,6 +7,7 @@
 - 篮子成本逐只计费 + 篮子整体滑点加成
 - 成本敏感性测试（参数变化对总成本的敏感度）
 """
+
 from __future__ import annotations
 
 import math
@@ -19,15 +20,15 @@ from cost_model import CostModel, sensitivity_table
 
 def cfg(**overrides) -> CostConfig:
     """默认零滑点、零最低佣金的测试配置，便于精确断言。"""
-    base = dict(
-        commission_rate=0.00025,
-        min_commission=0.0,
-        stamp_tax_rate=0.0005,
-        transfer_fee_rate=0.00001,
-        spread_rate=0.0,
-        impact_coef=0.0,
-        basket_slippage_bps=1.0,
-    )
+    base = {
+        "commission_rate": 0.00025,
+        "min_commission": 0.0,
+        "stamp_tax_rate": 0.0005,
+        "transfer_fee_rate": 0.00001,
+        "spread_rate": 0.0,
+        "impact_coef": 0.0,
+        "basket_slippage_bps": 1.0,
+    }
     base.update(overrides)
     return CostConfig(**base)
 
@@ -110,8 +111,22 @@ def test_zero_volume_no_impact():
 def test_basket_cost_per_leg_plus_surcharge():
     model = CostModel(cfg(basket_slippage_bps=2.0))
     legs = [
-        {"symbol": "600000", "side": "BUY", "quantity": 100, "price": 10.0, "is_etf": False, "volume": 10000},
-        {"symbol": "000001", "side": "BUY", "quantity": 200, "price": 5.0, "is_etf": False, "volume": 20000},
+        {
+            "symbol": "600000",
+            "side": "BUY",
+            "quantity": 100,
+            "price": 10.0,
+            "is_etf": False,
+            "volume": 10000,
+        },
+        {
+            "symbol": "000001",
+            "side": "BUY",
+            "quantity": 200,
+            "price": 5.0,
+            "is_etf": False,
+            "volume": 20000,
+        },
     ]
     bc = model.compute_basket(legs)
     # 基准成交额 = 100*10 + 200*5 = 2000；篮子滑点 = 2000 * 2bp
@@ -140,8 +155,14 @@ def test_per_trade_detail_auditable():
 # ---------------------------------------------------------------------------
 def test_sensitivity_commission_rate():
     rows = sensitivity_table(
-        CostConfig(), "commission_rate", [0.0001, 0.0003, 0.0005],
-        side="BUY", quantity=10000, price=3.0, volume=1_000_000, is_etf=True,
+        CostConfig(),
+        "commission_rate",
+        [0.0001, 0.0003, 0.0005],
+        side="BUY",
+        quantity=10000,
+        price=3.0,
+        volume=1_000_000,
+        is_etf=True,
     )
     totals = [r["total_cost"] for r in rows]
     assert totals[0] < totals[1] < totals[2]
@@ -150,15 +171,27 @@ def test_sensitivity_commission_rate():
 
 def test_sensitivity_impact_coef_and_spread():
     rows = sensitivity_table(
-        CostConfig(), "impact_coef", [0.0, 0.05, 0.10],
-        side="BUY", quantity=10000, price=3.0, volume=100_000, is_etf=True,
+        CostConfig(),
+        "impact_coef",
+        [0.0, 0.05, 0.10],
+        side="BUY",
+        quantity=10000,
+        price=3.0,
+        volume=100_000,
+        is_etf=True,
     )
     totals = [r["total_cost"] for r in rows]
     assert totals[0] < totals[1] < totals[2]
 
     rows2 = sensitivity_table(
-        CostConfig(), "spread_rate", [0.0, 0.0002, 0.0004],
-        side="BUY", quantity=10000, price=3.0, volume=1_000_000, is_etf=True,
+        CostConfig(),
+        "spread_rate",
+        [0.0, 0.0002, 0.0004],
+        side="BUY",
+        quantity=10000,
+        price=3.0,
+        volume=1_000_000,
+        is_etf=True,
     )
     totals2 = [r["total_cost"] for r in rows2]
     assert totals2[0] < totals2[1] < totals2[2]
@@ -167,11 +200,19 @@ def test_sensitivity_impact_coef_and_spread():
 def test_sensitivity_output_conclusion():
     """敏感性测试输出：打印一张表，证明"成本敏感"结论可跑出来。"""
     rows = sensitivity_table(
-        CostConfig(), "impact_coef", [0.0, 0.03, 0.05, 0.10],
-        side="BUY", quantity=10000, price=3.0, volume=100_000, is_etf=True,
+        CostConfig(),
+        "impact_coef",
+        [0.0, 0.03, 0.05, 0.10],
+        side="BUY",
+        quantity=10000,
+        price=3.0,
+        volume=100_000,
+        is_etf=True,
     )
     print("\n=== 成本敏感性：impact_coef 对总成本的影响 ===")
     print("impact_coef | total_fee | slippage_cost | total_cost")
     for r in rows:
-        print(f"{r['impact_coef']:<11} | {r['total_fee']:.4f} | {r['slippage_cost']:.4f} | {r['total_cost']:.4f}")
+        print(
+            f"{r['impact_coef']:<11} | {r['total_fee']:.4f} | {r['slippage_cost']:.4f} | {r['total_cost']:.4f}"
+        )
     assert rows[-1]["total_cost"] > rows[0]["total_cost"]

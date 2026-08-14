@@ -3,10 +3,11 @@
 事件流：MarketDataEvent → SignalEvent → OrderEvent → FillEvent → PortfolioEvent
 每个事件都带 ``timestamp``（bar 时间戳），保证可追溯与可审计。
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
 
@@ -40,10 +41,10 @@ class SignalEvent(Event):
     """信号事件：策略在某一时点发出的交易意图。"""
 
     symbol: str
-    side: str                      # BUY / SELL
+    side: str  # BUY / SELL
     quantity: float
-    order_type: str = "market"     # market / limit
-    limit_price: Optional[float] = None
+    order_type: str = "market"  # market / limit
+    limit_price: float | None = None
     reason: str = ""
 
 
@@ -56,9 +57,9 @@ class OrderEvent(Event):
     side: str
     quantity: float
     order_type: str = "market"
-    limit_price: Optional[float] = None
-    status: str = "created"         # created / pending / filled / rejected / cancelled
-    fill_timestamp: Optional[pd.Timestamp] = None  # 计划撮合时点（next_bar 模式）
+    limit_price: float | None = None
+    status: str = "created"  # created / pending / filled / rejected / cancelled
+    fill_timestamp: pd.Timestamp | None = None  # 计划撮合时点（next_bar 模式）
 
 
 @dataclass
@@ -69,13 +70,13 @@ class FillEvent(Event):
     symbol: str
     side: str
     quantity: float
-    fill_price: float              # 撮合参考价（如开盘价）
-    exec_price: float              # 滑点调整后成交价
+    fill_price: float  # 撮合参考价（如开盘价）
+    exec_price: float  # 滑点调整后成交价
     commission: float = 0.0
     stamp_tax: float = 0.0
     transfer_fee: float = 0.0
     total_fee: float = 0.0
-    cost_breakdown: Any = None     # 成本明细对象（由成本模型返回，审计用）
+    cost_breakdown: Any = None  # 成本明细对象（由成本模型返回，审计用）
 
     @property
     def cash_flow(self) -> float:
@@ -84,7 +85,7 @@ class FillEvent(Event):
             return self.exec_price * self.quantity - self.total_fee
         return -(self.exec_price * self.quantity + self.total_fee)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "timestamp": self.timestamp,
             "order_id": self.order_id,
@@ -106,7 +107,7 @@ class PortfolioEvent(Event):
     """组合事件：某一 bar 期末的持仓与资金快照。"""
 
     cash: float
-    positions: Dict[str, float]
+    positions: dict[str, float]
     market_value: float
     equity: float
     available_cash: float = 0.0

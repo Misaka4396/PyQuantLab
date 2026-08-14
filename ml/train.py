@@ -14,9 +14,8 @@
 - DL/RL 为开关：config 关闭时只训练 LightGBM。
 - 固定种子 + 记录数据/特征/超参版本，模型经 ``ModelRegistry`` 版本化，可回滚。
 """
-from __future__ import annotations
 
-from typing import Optional, Sequence, Union
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -26,7 +25,7 @@ from ml.cv import purged_kfold
 from ml.model_registry import ModelRegistry
 from ml.models_lgb import LightGBMModel
 from ml.models_torch import train_torch_from_arrays
-from ml.run_config import TrainConfig, TASK_CLASSIFICATION, TASK_REGRESSION
+from ml.run_config import TASK_CLASSIFICATION, TrainConfig
 
 
 # ---------------------------------------------------------------------------
@@ -41,7 +40,7 @@ def _encode_labels(task: str, y) -> np.ndarray:
 
 
 def _iloc(obj, idx: np.ndarray):
-    if isinstance(obj, (pd.DataFrame, pd.Series)):
+    if isinstance(obj, pd.DataFrame | pd.Series):
         return obj.iloc[idx]
     return np.asarray(obj)[idx]
 
@@ -86,7 +85,7 @@ def train_lightgbm(
     config: TrainConfig,
     X,
     y,
-    times: Optional[pd.DatetimeIndex] = None,
+    times: pd.DatetimeIndex | None = None,
     n_splits: int = 3,
 ) -> dict:
     """训练 LightGBM 基线：Purged CV 评估 + 全样本训练，返回 {model, metrics}。"""
@@ -110,7 +109,8 @@ def train_dl(config: TrainConfig, X, y) -> dict:
     """训练 LSTM/Transformer（严格时序切分，CPU），返回 {model, metrics, history}。"""
     ya = np.asarray(y, dtype=float).ravel()
     res = train_torch_from_arrays(
-        X, ya,
+        X,
+        ya,
         model_name=config.dl_model,
         seq_len=config.seq_len,
         hidden_size=config.hidden_size,
@@ -125,7 +125,11 @@ def train_dl(config: TrainConfig, X, y) -> dict:
     history = res["history"]
     return {
         "model": res["model"],
-        "metrics": {"final_val_loss": float(history["val_loss"][-1]) if history["val_loss"] else float("nan")},
+        "metrics": {
+            "final_val_loss": float(history["val_loss"][-1])
+            if history["val_loss"]
+            else float("nan")
+        },
         "history": history,
     }
 
@@ -136,10 +140,14 @@ def train_dl(config: TrainConfig, X, y) -> dict:
 def _hyperparams_for(config: TrainConfig, name: str) -> dict:
     if name == "torch":
         return {
-            "dl_model": config.dl_model, "seq_len": config.seq_len,
-            "hidden_size": config.hidden_size, "num_layers": config.num_layers,
-            "dropout": config.dropout, "dl_epochs": config.dl_epochs,
-            "batch_size": config.batch_size, "learning_rate": config.learning_rate,
+            "dl_model": config.dl_model,
+            "seq_len": config.seq_len,
+            "hidden_size": config.hidden_size,
+            "num_layers": config.num_layers,
+            "dropout": config.dropout,
+            "dl_epochs": config.dl_epochs,
+            "batch_size": config.batch_size,
+            "learning_rate": config.learning_rate,
         }
     return dict(config.lgb_params)
 
@@ -151,7 +159,7 @@ def train(
     config: TrainConfig,
     X,
     y,
-    times: Optional[pd.DatetimeIndex] = None,
+    times: pd.DatetimeIndex | None = None,
 ) -> dict:
     """训练入口：按 config 开关训练 LightGBM / DL / RL，并版本化保存。
 
@@ -178,22 +186,25 @@ def train(
         model = r.get("model")
         if model is None:
             continue
-        versions[name] = registry.save(model, {
-            "model_type": "torch" if name == "torch" else "lightgbm",
-            "task": config.task,
-            "data_version": config.data_version,
-            "feature_version": config.feature_version,
-            "hyperparams": _hyperparams_for(config, name),
-            "seed": config.seed,
-            "metrics": r.get("metrics", {}),
-        })
+        versions[name] = registry.save(
+            model,
+            {
+                "model_type": "torch" if name == "torch" else "lightgbm",
+                "task": config.task,
+                "data_version": config.data_version,
+                "feature_version": config.feature_version,
+                "hyperparams": _hyperparams_for(config, name),
+                "seed": config.seed,
+                "metrics": r.get("metrics", {}),
+            },
+        )
 
     return {"models": trained, "versions": versions, "config": config}
 
 
 __all__ = [
-    "train",
-    "train_lightgbm",
-    "train_dl",
     "_encode_labels",
+    "train",
+    "train_dl",
+    "train_lightgbm",
 ]

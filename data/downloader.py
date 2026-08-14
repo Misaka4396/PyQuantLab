@@ -1,7 +1,6 @@
 """yfinance wrapper with retry logic and exponential backoff."""
 
 import time
-from typing import List, Optional
 
 import pandas as pd
 import yfinance as yf
@@ -17,7 +16,7 @@ class DataDownloader:
 
     def download(
         self,
-        tickers: List[str],
+        tickers: list[str],
         start: str,
         end: str,
         interval: str = "1d",
@@ -38,20 +37,16 @@ class DataDownloader:
                     raise DataDownloadError(f"No data returned for {tickers}")
                 if len(tickers) == 1:
                     data = data.copy()
-                    data.columns = pd.MultiIndex.from_product(
-                        [tickers, data.columns]
-                    )
+                    data.columns = pd.MultiIndex.from_product([tickers, data.columns])
                 return data
             except DataDownloadError:
                 raise
             except Exception as e:
                 if attempt < self.max_retries - 1:
-                    wait = self.retry_delay * (2 ** attempt)
+                    wait = self.retry_delay * (2**attempt)
                     time.sleep(wait)
                 else:
-                    raise DataDownloadError(
-                        f"Failed after {self.max_retries} attempts: {e}"
-                    ) from e
+                    raise DataDownloadError(f"Failed after {self.max_retries} attempts: {e}") from e
 
     def download_single(
         self, ticker: str, start: str, end: str, interval: str = "1d"

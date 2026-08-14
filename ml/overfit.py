@@ -25,12 +25,13 @@
 与 A4 联动：``oosis_degradation`` / ``assess_overfitting`` 消费
 ``backtest.metrics_enhanced.compare_is_oos`` 的 IS/OOS 权益对比结果。
 """
+
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import combinations
-from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -47,11 +48,11 @@ EULER_MASCHERONI = 0.5772156649015329
 # ---------------------------------------------------------------------------
 # 判定阈值（上线建议用）
 # ---------------------------------------------------------------------------
-DSR_SAFE = 0.95            # DSR >= 0.95：样本外显著（低风险）
-DSR_HIGH_RISK = 0.80       # DSR < 0.80：高风险
-PBO_LOW_RISK = 0.10        # PBO <= 0.10：低风险
-PBO_HIGH_RISK = 0.30       # PBO > 0.30：高风险
-DEGRADATION_SAFE = 0.80    # OOS/IS Sharpe 衰减 >= 0.8：低风险
+DSR_SAFE = 0.95  # DSR >= 0.95：样本外显著（低风险）
+DSR_HIGH_RISK = 0.80  # DSR < 0.80：高风险
+PBO_LOW_RISK = 0.10  # PBO <= 0.10：低风险
+PBO_HIGH_RISK = 0.30  # PBO > 0.30：高风险
+DEGRADATION_SAFE = 0.80  # OOS/IS Sharpe 衰减 >= 0.8：低风险
 DEGRADATION_HIGH_RISK = 0.50  # 衰减 < 0.5：高风险
 
 RISK_LOW = "低"
@@ -75,13 +76,13 @@ def sharpe_standard_error(
     """
     if num_observations < 2:
         raise ValueError("num_observations 至少为 2")
-    var = (1.0 - skew * observed_sr + (kurtosis - 1.0) / 4.0 * observed_sr ** 2) / (
+    var = (1.0 - skew * observed_sr + (kurtosis - 1.0) / 4.0 * observed_sr**2) / (
         num_observations - 1.0
     )
     return float(np.sqrt(max(var, 0.0)))
 
 
-def skewness_kurtosis(returns) -> Tuple[float, float, float]:
+def skewness_kurtosis(returns) -> tuple[float, float, float]:
     """返回 (偏度 γ3, 超额峰度, full 峰度 γ4)。"""
     r = np.asarray(returns, dtype=float).ravel()
     if len(r) < 3:
@@ -198,19 +199,19 @@ def dsr_from_returns(
 class CSCVResult:
     """CSCV 输出。"""
 
-    logits: np.ndarray            # 每个组合的 rank logit λ_c
-    omega_ranks: np.ndarray       # 每个组合中 IS 最优策略的 OOS rank（1=最好）
+    logits: np.ndarray  # 每个组合的 rank logit λ_c
+    omega_ranks: np.ndarray  # 每个组合中 IS 最优策略的 OOS rank（1=最好）
     n_combinations: int
     n_submatrices: int
-    pbo: float                    # 参数版 PBO = Φ(mean(λ)/std(λ))
-    pbo_freq: float               # 非参数版 PBO = P(λ_c > 0)（IS 最优落入 OOS 下半区）
+    pbo: float  # 参数版 PBO = Φ(mean(λ)/std(λ))
+    pbo_freq: float  # 非参数版 PBO = P(λ_c > 0)（IS 最优落入 OOS 下半区）
 
 
 def cscv_splits(
     n_submatrices: int,
-    max_combinations: Optional[int] = None,
+    max_combinations: int | None = None,
     seed: int = 42,
-) -> List[Tuple[np.ndarray, np.ndarray]]:
+) -> list[tuple[np.ndarray, np.ndarray]]:
     """生成 CSCV 的组合对称 IS/OOS 划分。
 
     S 个子矩阵，任取 S/2 个做 IS（其余 OOS），共 C(S, S/2) 个组合。
@@ -238,8 +239,8 @@ def cscv_splits(
 def cscv(
     performance_matrix,
     n_submatrices: int = 4,
-    performance_func: Optional[Callable] = None,
-    max_combinations: Optional[int] = None,
+    performance_func: Callable | None = None,
+    max_combinations: int | None = None,
     seed: int = 42,
 ) -> CSCVResult:
     """组合对称交叉验证（CSCV）。
@@ -264,12 +265,13 @@ def cscv(
     if s > T:
         raise ValueError("n_submatrices 不能超过观测行数 T")
     if performance_func is None:
+
         def performance_func(x):
             return np.nanmean(x, axis=0)
 
     bounds = np.array_split(np.arange(T), s)
-    logits: List[float] = []
-    omegas: List[int] = []
+    logits: list[float] = []
+    omegas: list[int] = []
     for is_idx, oos_idx in cscv_splits(s, max_combinations=max_combinations, seed=seed):
         is_rows = np.concatenate([bounds[i] for i in is_idx])
         oos_rows = np.concatenate([bounds[i] for i in oos_idx])
@@ -301,8 +303,8 @@ def cscv(
 def probability_of_backtest_overfitting(
     performance_matrix,
     n_submatrices: int = 4,
-    performance_func: Optional[Callable] = None,
-    max_combinations: Optional[int] = None,
+    performance_func: Callable | None = None,
+    max_combinations: int | None = None,
     seed: int = 42,
 ) -> float:
     """PBO（参数版）：IS 最优策略在 OOS 落入下半区的概率。"""
@@ -330,7 +332,8 @@ def oosis_degradation(
     sharpe_degradation = OOS/IS Sharpe、return_degradation = OOS/IS 年化收益。
     """
     return compare_is_oos(
-        is_equity, oos_equity,
+        is_equity,
+        oos_equity,
         periods_per_year=periods_per_year,
         risk_free_rate=risk_free_rate,
     )
@@ -340,13 +343,13 @@ def oosis_degradation(
 # 风险结论与上线建议
 # ---------------------------------------------------------------------------
 def conclude_overfitting(
-    dsr: Optional[float] = None,
-    pbo: Optional[float] = None,
-    sharpe_degradation: Optional[float] = None,
+    dsr: float | None = None,
+    pbo: float | None = None,
+    sharpe_degradation: float | None = None,
 ) -> dict:
     """按阈值给出整体风险等级与上线建议（取各可用信号的最差等级）。"""
-    levels: List[str] = []
-    reasons: List[str] = []
+    levels: list[str] = []
+    reasons: list[str] = []
 
     if dsr is not None:
         if dsr >= DSR_SAFE:
@@ -409,18 +412,18 @@ class OverfitAssessment:
 
     risk_level: str
     recommendation: str
-    reasons: List[str] = field(default_factory=list)
-    dsr: Optional[float] = None
-    pbo: Optional[float] = None
-    pbo_freq: Optional[float] = None
-    sharpe_degradation: Optional[float] = None
-    return_degradation: Optional[float] = None
-    is_sharpe: Optional[float] = None
-    oos_sharpe: Optional[float] = None
-    sharpe_period: Optional[float] = None
-    sharpe_annual: Optional[float] = None
-    skew: Optional[float] = None
-    kurtosis: Optional[float] = None
+    reasons: list[str] = field(default_factory=list)
+    dsr: float | None = None
+    pbo: float | None = None
+    pbo_freq: float | None = None
+    sharpe_degradation: float | None = None
+    return_degradation: float | None = None
+    is_sharpe: float | None = None
+    oos_sharpe: float | None = None
+    sharpe_period: float | None = None
+    sharpe_annual: float | None = None
+    skew: float | None = None
+    kurtosis: float | None = None
     trials: int = 1
     thresholds: dict = field(default_factory=dict)
 
@@ -449,10 +452,10 @@ def assess_overfitting(
     is_equity=None,
     oos_equity=None,
     returns=None,
-    observed_sharpe: Optional[float] = None,
-    num_observations: Optional[int] = None,
-    skew: Optional[float] = None,
-    kurtosis: Optional[float] = None,
+    observed_sharpe: float | None = None,
+    num_observations: int | None = None,
+    skew: float | None = None,
+    kurtosis: float | None = None,
     trials: int = 1,
     benchmark_sr: float = 0.0,
     performance_matrix=None,
@@ -468,9 +471,9 @@ def assess_overfitting(
 
     注意：``observed_sharpe`` 与 ``benchmark_sr`` 均为**非年化（每期）**口径。
     """
-    dsr: Optional[float] = None
-    sharpe_annual: Optional[float] = None
-    sharpe_period: Optional[float] = None
+    dsr: float | None = None
+    sharpe_annual: float | None = None
+    sharpe_period: float | None = None
     skew_v = skew
     kurt_v = kurtosis
 
@@ -478,7 +481,8 @@ def assess_overfitting(
     degradation = None
     if is_equity is not None and oos_equity is not None:
         degradation = compare_is_oos(
-            is_equity, oos_equity,
+            is_equity,
+            oos_equity,
             periods_per_year=periods_per_year,
             risk_free_rate=risk_free_rate,
         )
@@ -486,8 +490,11 @@ def assess_overfitting(
     # 2) DSR
     if returns is not None:
         info = dsr_from_returns(
-            returns, trials=trials, benchmark_sr=benchmark_sr,
-            periods_per_year=periods_per_year, risk_free_rate=risk_free_rate,
+            returns,
+            trials=trials,
+            benchmark_sr=benchmark_sr,
+            periods_per_year=periods_per_year,
+            risk_free_rate=risk_free_rate,
         )
         dsr = info["dsr"]
         sharpe_annual = info["sharpe_annual"]
@@ -496,17 +503,19 @@ def assess_overfitting(
         kurt_v = info["kurtosis"]
     elif observed_sharpe is not None:
         if num_observations is None or skew is None or kurtosis is None:
-            raise ValueError(
-                "提供 observed_sharpe 时需同时提供 num_observations / skew / kurtosis"
-            )
+            raise ValueError("提供 observed_sharpe 时需同时提供 num_observations / skew / kurtosis")
         dsr = deflated_sharpe_ratio(
-            observed_sharpe, num_observations, skew, kurtosis,
-            trials=trials, benchmark_sr=benchmark_sr,
+            observed_sharpe,
+            num_observations,
+            skew,
+            kurtosis,
+            trials=trials,
+            benchmark_sr=benchmark_sr,
         )
 
     # 3) PBO
-    pbo: Optional[float] = None
-    pbo_freq: Optional[float] = None
+    pbo: float | None = None
+    pbo_freq: float | None = None
     if performance_matrix is not None:
         res = cscv(performance_matrix, n_submatrices=n_submatrices)
         pbo = res.pbo
@@ -544,28 +553,28 @@ def assess_overfitting(
 
 
 __all__ = [
-    "EULER_MASCHERONI",
-    "DSR_SAFE",
-    "DSR_HIGH_RISK",
-    "PBO_LOW_RISK",
-    "PBO_HIGH_RISK",
-    "DEGRADATION_SAFE",
     "DEGRADATION_HIGH_RISK",
+    "DEGRADATION_SAFE",
+    "DSR_HIGH_RISK",
+    "DSR_SAFE",
+    "EULER_MASCHERONI",
+    "PBO_HIGH_RISK",
+    "PBO_LOW_RISK",
+    "RISK_HIGH",
     "RISK_LOW",
     "RISK_MEDIUM",
-    "RISK_HIGH",
-    "sharpe_standard_error",
-    "skewness_kurtosis",
-    "probabilistic_sharpe_ratio",
-    "expected_max_sharpe_ratio",
-    "deflated_sharpe_ratio",
-    "dsr_from_returns",
     "CSCVResult",
-    "cscv_splits",
-    "cscv",
-    "probability_of_backtest_overfitting",
-    "oosis_degradation",
-    "conclude_overfitting",
     "OverfitAssessment",
     "assess_overfitting",
+    "conclude_overfitting",
+    "cscv",
+    "cscv_splits",
+    "deflated_sharpe_ratio",
+    "dsr_from_returns",
+    "expected_max_sharpe_ratio",
+    "oosis_degradation",
+    "probabilistic_sharpe_ratio",
+    "probability_of_backtest_overfitting",
+    "sharpe_standard_error",
+    "skewness_kurtosis",
 ]

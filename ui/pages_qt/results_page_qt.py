@@ -1,8 +1,5 @@
 """结果分析页面 — 详细绩效与风险分析."""
 
-import numpy as np
-import pandas as pd
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QGroupBox,
@@ -18,7 +15,7 @@ from PyQt5.QtWidgets import (
 
 from backtest.report import BacktestReport
 from backtest.risk import RiskAnalyzer
-from ui.charts_qt import equity_curve_chart, returns_histogram, rolling_chart
+from ui.charts_qt import equity_curve_chart, rolling_chart
 
 FONT_FAMILY = "Microsoft YaHei"
 
@@ -91,8 +88,6 @@ class ResultsPage(QWidget):
         layout = QVBoxLayout(w)
         self.trade_kpi_layout = QHBoxLayout()
         self.trade_kpis = {}
-        kpi_names = {"总交易次数": "Total Trades", "胜率": "Win Rate",
-                      "平均盈利": "Avg Win", "平均亏损": "Avg Loss", "盈亏比": "Profit Factor"}
         for name in ["总交易次数", "胜率", "平均盈利", "平均亏损", "盈亏比"]:
             kw = QWidget()
             kl = QVBoxLayout(kw)
@@ -156,11 +151,12 @@ class ResultsPage(QWidget):
 
     def on_activated(self):
         from PyQt5.QtWidgets import QApplication
+
         for w in QApplication.instance().allWidgets():
-            if hasattr(w, 'nav_list'):
+            if hasattr(w, "nav_list"):
                 bp = w.pages[3]
-                if hasattr(bp, 'results') and bp.results:
-                    name = list(bp.results.keys())[0]
+                if hasattr(bp, "results") and bp.results:
+                    name = next(iter(bp.results.keys()))
                     result = bp.results[name]
                     self._display(result)
                 break
@@ -204,7 +200,9 @@ class ResultsPage(QWidget):
         if not dd_df.empty:
             self.dd_table.setRowCount(len(dd_df))
             self.dd_table.setColumnCount(5)
-            self.dd_table.setHorizontalHeaderLabels(["起始日期", "结束日期", "持续天数", "最大回撤", "恢复程度"])
+            self.dd_table.setHorizontalHeaderLabels(
+                ["起始日期", "结束日期", "持续天数", "最大回撤", "恢复程度"]
+            )
             for row in range(len(dd_df)):
                 for col, key in enumerate(["start", "end", "duration", "max_drawdown", "recovery"]):
                     val = dd_df.iloc[row][key]
@@ -223,9 +221,9 @@ class ResultsPage(QWidget):
 
         # 交易分析
         self.trade_kpis["总交易次数"].setText(str(m.total_trades))
-        self.trade_kpis["胜率"].setText(f"{m.win_rate*100:.1f}%")
-        self.trade_kpis["平均盈利"].setText(f"{m.avg_win*100:.2f}%")
-        self.trade_kpis["平均亏损"].setText(f"{m.avg_loss*100:.2f}%")
+        self.trade_kpis["胜率"].setText(f"{m.win_rate * 100:.1f}%")
+        self.trade_kpis["平均盈利"].setText(f"{m.avg_win * 100:.2f}%")
+        self.trade_kpis["平均亏损"].setText(f"{m.avg_loss * 100:.2f}%")
         self.trade_kpis["盈亏比"].setText(f"{m.profit_factor:.2f}")
 
         trades = result.trades
@@ -233,12 +231,14 @@ class ResultsPage(QWidget):
             self.trades_table.setRowCount(len(trades))
             cols = ["entry_date", "exit_date", "pnl", "pnl_pct", "win"]
             self.trades_table.setColumnCount(len(cols))
-            self.trades_table.setHorizontalHeaderLabels(["入场日期", "出场日期", "盈亏", "盈亏 %", "盈利"])
+            self.trades_table.setHorizontalHeaderLabels(
+                ["入场日期", "出场日期", "盈亏", "盈亏 %", "盈利"]
+            )
             for row in range(len(trades)):
                 for col, key in enumerate(cols):
                     val = trades.iloc[row][key]
                     if key == "pnl_pct":
-                        val = f"{val*100:.2f}%"
+                        val = f"{val * 100:.2f}%"
                     elif key == "win":
                         val = "是" if val else "否"
                     item = QTableWidgetItem(str(val))
@@ -247,15 +247,19 @@ class ResultsPage(QWidget):
 
         # 风险
         tail = RiskAnalyzer.tail_risk(returns)
-        for name, key in [("偏度", "skewness"), ("峰度", "kurtosis"),
-                           ("VaR 99%", "var_99"), ("最大日亏损", "max_daily_loss")]:
+        for name, key in [
+            ("偏度", "skewness"),
+            ("峰度", "kurtosis"),
+            ("VaR 99%", "var_99"),
+            ("最大日亏损", "max_daily_loss"),
+        ]:
             v = tail[key]
             if abs(v) < 1:
                 fmt = f"{v:.4f}"
             elif abs(v) < 0.1:
-                fmt = f"{v*100:.3f}%"
+                fmt = f"{v * 100:.3f}%"
             else:
-                fmt = f"{v*100:.2f}%"
+                fmt = f"{v * 100:.2f}%"
             self.tail_labels[name].setText(fmt)
 
         stress = RiskAnalyzer.stress_test(returns)

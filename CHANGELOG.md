@@ -2,6 +2,18 @@
 
 本项目使用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式。
 
+## [v1.2.3] - 2026-08-13
+
+### 新增：工程化工具链（P0：ruff + pre-commit + CI）
+
+- 新增 `pyproject.toml`：ruff（lint+format，line-length 100，中文项目忽略 RUF001/2/3）、mypy（宽松）、pytest、coverage 门禁（fail_under=80，范围限定 A/B/C 新专项）
+- 全库 lint 修复：3102 错误 → 0（pyupgrade 现代化 Optional→`|`、unused-import、E741 变量名等）；86 文件 ruff format 统一格式
+- 新增 `.pre-commit-config.yaml`：提交前自动 ruff --fix + format + 文件检查（经 ssh.github.com:443 拉取 hook，规避 github.com 封锁）
+- 新增 `requirements-dev.txt`：pytest/pytest-cov/ruff/mypy/pre-commit；`requirements.txt` 补齐 lightgbm/scikit-learn/akshare
+- 新增 `.github/workflows/ci.yml`：GitHub Actions（lint job：ruff check + format + mypy 报告；test job：torch CPU + pytest --cov 门禁 ≥80%）
+- 修复 `core/types.py` 缺失 numpy 导入（F821）；`backtest/report.py` import 重构（Agg 模式保留 noqa）
+- 实测：ruff check 0 错误、pre-commit 全过、**146 测试通过、覆盖率 84.34% ≥ 80% 门禁**
+
 ## [v1.2.2] - 2026-08-13
 
 ### 变更：共享 DLL 目录（方案 A）

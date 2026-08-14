@@ -22,16 +22,31 @@ class RSIStrategy(BaseStrategy):
     def get_param_spec(cls) -> dict:
         return {
             "period": {
-                "type": "int", "default": 14, "min": 2, "max": 50, "step": 1,
-                "label": "RSI 周期", "help": "RSI 计算回看窗口",
+                "type": "int",
+                "default": 14,
+                "min": 2,
+                "max": 50,
+                "step": 1,
+                "label": "RSI 周期",
+                "help": "RSI 计算回看窗口",
             },
             "oversold": {
-                "type": "int", "default": 30, "min": 10, "max": 40, "step": 1,
-                "label": "超卖阈值", "help": "RSI 低于此值为超卖（买入信号）",
+                "type": "int",
+                "default": 30,
+                "min": 10,
+                "max": 40,
+                "step": 1,
+                "label": "超卖阈值",
+                "help": "RSI 低于此值为超卖（买入信号）",
             },
             "overbought": {
-                "type": "int", "default": 70, "min": 60, "max": 90, "step": 1,
-                "label": "超买阈值", "help": "RSI 高于此值为超买（卖出信号）",
+                "type": "int",
+                "default": 70,
+                "min": 60,
+                "max": 90,
+                "step": 1,
+                "label": "超买阈值",
+                "help": "RSI 高于此值为超买（卖出信号）",
             },
         }
 

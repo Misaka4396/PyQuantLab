@@ -7,9 +7,8 @@
 - 时序切分（train/val/test）必须按时间先后切（见 ``train_val_split_by_time``），
   不能用随机切分，否则未来样本会进入训练集。
 """
-from __future__ import annotations
 
-from typing import Tuple
+from __future__ import annotations
 
 import numpy as np
 import torch
@@ -49,7 +48,7 @@ class TimeSeriesDataset(Dataset):
         return torch.from_numpy(x.copy()), torch.tensor(float(y), dtype=torch.float32)
 
     # ------------------------------------------------------------------
-    def window(self, idx: int) -> Tuple[np.ndarray, float]:
+    def window(self, idx: int) -> tuple[np.ndarray, float]:
         """返回第 idx 个样本的 (特征窗口 ndarray, 标签)（供测试/审计对照）。"""
         end = idx + self.seq_len
         return self.X[idx:end].copy(), float(self.y[end - 1])
@@ -57,7 +56,7 @@ class TimeSeriesDataset(Dataset):
 
 def train_val_split_by_time(
     X, y, train_frac: float = 0.8
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """按时间先后严格切分训练/验证（无随机，无未来串扰）。"""
     X = np.asarray(X, dtype=np.float32)
     y = np.asarray(y, dtype=np.float32).ravel()

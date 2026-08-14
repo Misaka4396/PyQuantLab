@@ -10,17 +10,16 @@
 5. 压力测试：涨跌停潮 / 停牌 / 极端折溢价下最大敞口。
 6. 与 A4 联动出报告（``backtest.report.ReportGenerator`` + 折溢价机会统计）。
 """
+
 from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
-
-import numpy as np
-import pandas as pd
 
 import matplotlib
+import numpy as np
+import pandas as pd
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -32,9 +31,9 @@ from engine import EngineConfig, EventEngine
 from etf.basket_execution import BasketExecutor
 from etf.etf_signal import ETFSignalGenerator, entry_threshold
 from etf.etf_strategy import (
-    ETFArbitrageStrategy,
     IDEAL,
     SYNC_RISK,
+    ETFArbitrageStrategy,
     _leg_notional,
 )
 from etf.execution_config import ExecutionConfig
@@ -66,13 +65,13 @@ def run_arbitrage_backtest(
     etf_quantity: float = 100_000.0,
     execution_mode: str = IDEAL,
     *,
-    basket: Optional[Dict[str, float]] = None,
-    stock_quotes: Optional[Dict[str, pd.DataFrame]] = None,
-    cost_model: Optional[CostModel] = None,
+    basket: dict[str, float] | None = None,
+    stock_quotes: dict[str, pd.DataFrame] | None = None,
+    cost_model: CostModel | None = None,
     initial_cash: float = 1_000_000.0,
-    threshold_config: Optional[ThresholdConfig] = None,
-    unit_cost_rate: Optional[float] = None,
-    executor: Optional[BasketExecutor] = None,
+    threshold_config: ThresholdConfig | None = None,
+    unit_cost_rate: float | None = None,
+    executor: BasketExecutor | None = None,
     seed: int = 42,
 ) -> EventEngine:
     """把 ETF 套利策略挂载到 A2 引擎并跑一次回测，返回 EngineResult。
@@ -86,7 +85,7 @@ def run_arbitrage_backtest(
     quotes = quotes.copy()
     premium = pd.to_numeric(premium, errors="coerce").reindex(quotes.index)
 
-    data: Dict[str, pd.DataFrame] = {etf_symbol: quotes}
+    data: dict[str, pd.DataFrame] = {etf_symbol: quotes}
     if stock_quotes:
         data.update(stock_quotes)
 
@@ -124,13 +123,13 @@ def run_dual_mode(
     etf_symbol: str,
     etf_quantity: float = 100_000.0,
     *,
-    basket: Optional[Dict[str, float]] = None,
-    stock_quotes: Optional[Dict[str, pd.DataFrame]] = None,
-    cost_model: Optional[CostModel] = None,
+    basket: dict[str, float] | None = None,
+    stock_quotes: dict[str, pd.DataFrame] | None = None,
+    cost_model: CostModel | None = None,
     initial_cash: float = 1_000_000.0,
-    threshold_config: Optional[ThresholdConfig] = None,
-    unit_cost_rate: Optional[float] = None,
-    executor: Optional[BasketExecutor] = None,
+    threshold_config: ThresholdConfig | None = None,
+    unit_cost_rate: float | None = None,
+    executor: BasketExecutor | None = None,
     seed: int = 42,
     participation_cap: float = 0.05,
 ) -> ETFBacktestResult:
@@ -140,16 +139,33 @@ def run_dual_mode(
     threshold = gen.threshold
 
     ideal = run_arbitrage_backtest(
-        quotes, premium, etf_symbol, etf_quantity, IDEAL,
-        basket=basket, stock_quotes=stock_quotes, cost_model=cost_model,
-        initial_cash=initial_cash, threshold_config=threshold_config,
-        unit_cost_rate=unit_cost_rate, seed=seed,
+        quotes,
+        premium,
+        etf_symbol,
+        etf_quantity,
+        IDEAL,
+        basket=basket,
+        stock_quotes=stock_quotes,
+        cost_model=cost_model,
+        initial_cash=initial_cash,
+        threshold_config=threshold_config,
+        unit_cost_rate=unit_cost_rate,
+        seed=seed,
     )
     sync = run_arbitrage_backtest(
-        quotes, premium, etf_symbol, etf_quantity, SYNC_RISK,
-        basket=basket, stock_quotes=stock_quotes, cost_model=cost_model,
-        initial_cash=initial_cash, threshold_config=threshold_config,
-        unit_cost_rate=unit_cost_rate, executor=executor, seed=seed,
+        quotes,
+        premium,
+        etf_symbol,
+        etf_quantity,
+        SYNC_RISK,
+        basket=basket,
+        stock_quotes=stock_quotes,
+        cost_model=cost_model,
+        initial_cash=initial_cash,
+        threshold_config=threshold_config,
+        unit_cost_rate=unit_cost_rate,
+        executor=executor,
+        seed=seed,
     )
 
     ideal_metrics = PerformanceAnalyzer(ideal.equity_curve, ideal.fills).summary()
@@ -164,7 +180,9 @@ def run_dual_mode(
         "sync_risk_total_return": float(sync_metrics["total_return"]),
         "ideal_sharpe": float(ideal_metrics["sharpe_ratio"]),
         "sync_risk_sharpe": float(sync_metrics["sharpe_ratio"]),
-        "execution_drag_return": float(ideal_metrics["total_return"] - sync_metrics["total_return"]),
+        "execution_drag_return": float(
+            ideal_metrics["total_return"] - sync_metrics["total_return"]
+        ),
         "ideal_total_fees": float(ideal_metrics["total_fees"]),
         "sync_risk_total_fees": float(sync_metrics["total_fees"]),
         "sync_risk_avg_exposure_ratio": avg_exposure,
@@ -172,9 +190,7 @@ def run_dual_mode(
     }
 
     premium_stats = premium_opportunity_stats(premium, threshold)
-    capacity = capacity_analysis(
-        sync.fills, quotes, etf_symbol, participation_cap, initial_cash
-    )
+    capacity = capacity_analysis(sync.fills, quotes, etf_symbol, participation_cap, initial_cash)
     stress = _stress_from_result(sync, etf_symbol, etf_quantity, basket, seed)
 
     return ETFBacktestResult(
@@ -216,7 +232,9 @@ def capacity_analysis(
 
     q = quotes.copy()
     if "amount" not in q.columns:
-        q["amount"] = pd.to_numeric(q.get("volume", 0.0), errors="coerce") * pd.to_numeric(q["close"], errors="coerce")
+        q["amount"] = pd.to_numeric(q.get("volume", 0.0), errors="coerce") * pd.to_numeric(
+            q["close"], errors="coerce"
+        )
     amount_map = pd.to_numeric(q["amount"], errors="coerce").to_dict()
 
     f = fills.copy()
@@ -232,7 +250,7 @@ def capacity_analysis(
         }
 
     parts = []
-    daily: Dict[pd.Timestamp, List[tuple]] = {}
+    daily: dict[pd.Timestamp, list[tuple]] = {}
     for _, row in etf_fills.iterrows():
         ts = pd.Timestamp(row["timestamp"])
         notional = float(row["exec_price"]) * float(row["quantity"])
@@ -246,17 +264,19 @@ def capacity_analysis(
     max_participation = float(max(parts)) if parts else 0.0
     capacity_capital = (
         float(initial_cash) * float(participation_cap) / max_participation
-        if max_participation > 0 else float("inf")
+        if max_participation > 0
+        else float("inf")
     )
 
     daily_parts = [
         sum(n for n, _ in v) / sum(a for _, a in v)
-        for v in daily.values() if sum(a for _, a in v) > 0
+        for v in daily.values()
+        if sum(a for _, a in v) > 0
     ]
     avg_daily = float(np.mean(daily_parts)) if daily_parts else 0.0
 
     return {
-        "n_fills": int(len(etf_fills)),
+        "n_fills": len(etf_fills),
         "max_participation": max_participation,
         "capacity_capital": capacity_capital,
         "avg_daily_participation": avg_daily,
@@ -277,9 +297,9 @@ def _scenario(note: str, result) -> dict:
 
 
 def stress_test(
-    legs: List[dict],
-    prices: Dict[str, float],
-    volumes: Optional[Dict[str, float]] = None,
+    legs: list[dict],
+    prices: dict[str, float],
+    volumes: dict[str, float] | None = None,
     seed: int = 42,
 ) -> dict:
     """三场景压力测试，输出各场景敞口与最大敞口。
@@ -290,7 +310,7 @@ def stress_test(
     """
     volumes = volumes or {}
     target = _leg_notional(legs, prices)
-    scenarios: Dict[str, dict] = {}
+    scenarios: dict[str, dict] = {}
 
     cfg_limit = ExecutionConfig(
         partial_fill_prob=1.0,
@@ -309,8 +329,8 @@ def stress_test(
     }
 
     legs_extreme = [
-        {"symbol": l["symbol"], "side": l["side"], "quantity": float(l["quantity"]) * 5.0}
-        for l in legs
+        {"symbol": leg["symbol"], "side": leg["side"], "quantity": float(leg["quantity"]) * 5.0}
+        for leg in legs
     ]
     cfg_extreme = ExecutionConfig(
         partial_fill_prob=1.0,
@@ -334,7 +354,7 @@ def _stress_from_result(
     result: EventEngine,
     etf_symbol: str,
     etf_quantity: float,
-    basket: Optional[Dict[str, float]],
+    basket: dict[str, float] | None,
     seed: int,
 ) -> dict:
     """由回测结果抽取代表性腿与价格，构造压力测试。"""
@@ -357,15 +377,21 @@ def premium_opportunity_stats(premium: pd.Series, threshold: float) -> dict:
     x = pd.to_numeric(premium, errors="coerce").dropna()
     if len(x) == 0:
         return {
-            "n_obs": 0, "n_opportunities": 0, "opportunity_frequency": 0.0,
-            "mean_premium": 0.0, "max_premium": 0.0, "min_premium": 0.0,
-            "mean_abs_premium": 0.0, "mean_opportunity_amplitude": 0.0,
-            "max_opportunity_amplitude": 0.0, "threshold": threshold,
+            "n_obs": 0,
+            "n_opportunities": 0,
+            "opportunity_frequency": 0.0,
+            "mean_premium": 0.0,
+            "max_premium": 0.0,
+            "min_premium": 0.0,
+            "mean_abs_premium": 0.0,
+            "mean_opportunity_amplitude": 0.0,
+            "max_opportunity_amplitude": 0.0,
+            "threshold": threshold,
         }
     opps = x[abs(x) >= threshold]
     return {
-        "n_obs": int(len(x)),
-        "n_opportunities": int(len(opps)),
+        "n_obs": len(x),
+        "n_opportunities": len(opps),
         "opportunity_frequency": float(len(opps) / len(x)),
         "mean_premium": float(x.mean()),
         "max_premium": float(x.max()),
@@ -382,9 +408,9 @@ def premium_opportunity_stats(premium: pd.Series, threshold: float) -> dict:
 # ---------------------------------------------------------------------------
 def generate_report(
     result: ETFBacktestResult,
-    output_dir: Union[str, Path],
+    output_dir: str | Path,
     title: str = "ETF 套利回测报告",
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """与 A4 联动：双模式绩效报告 + 对比图 + 汇总 JSON（含折溢价机会/容量/压力）。"""
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -419,7 +445,7 @@ def generate_report(
         "premium_stats": result.premium_stats,
         "capacity": result.capacity,
         "stress": result.stress,
-        "n_signals": int(len(result.signals)),
+        "n_signals": len(result.signals),
     }
     summary_path = out / "summary.json"
     summary_path.write_text(
@@ -442,9 +468,7 @@ def main() -> None:
     """合成数据跑一遍完整 B4 流程（演示/自检）。"""
     from etf.etf_data import synthetic_etf_minute
 
-    quotes = synthetic_etf_minute(
-        "510300", "2024-01-02", "2024-02-28", seed=7, freq="1min"
-    )
+    quotes = synthetic_etf_minute("510300", "2024-01-02", "2024-02-28", seed=7, freq="1min")
     # 构造均值回归的折溢价（溢价→回归），与 ETF 价联动
     close = quotes["close"]
     t = np.arange(len(close))
@@ -464,19 +488,21 @@ def main() -> None:
     for k, v in result.capacity.items():
         print(f"  {k}: {v}")
     print("=== 压力测试最大敞口 ===")
-    print(f"  最大敞口: {result.stress['max_exposure']:.2f} 元 "
-          f"({result.stress['max_exposure_scenario']})")
+    print(
+        f"  最大敞口: {result.stress['max_exposure']:.2f} 元 "
+        f"({result.stress['max_exposure_scenario']})"
+    )
     paths = generate_report(result, "./data_cache/etf_report")
     print("报告已生成：", list(paths.values()))
 
 
 __all__ = [
     "ETFBacktestResult",
+    "capacity_analysis",
+    "entry_threshold",
+    "generate_report",
+    "premium_opportunity_stats",
     "run_arbitrage_backtest",
     "run_dual_mode",
-    "capacity_analysis",
     "stress_test",
-    "premium_opportunity_stats",
-    "generate_report",
-    "entry_threshold",
 ]

@@ -1,10 +1,7 @@
 """Local Parquet-based cache manager for OHLCV data."""
 
-import os
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -22,9 +19,7 @@ class DataCache:
         filename = f"{ticker}_{start}_{end}_{interval}.parquet"
         return self.cache_dir / ticker / filename
 
-    def get(
-        self, ticker: str, start: str, end: str, interval: str
-    ) -> Optional[pd.DataFrame]:
+    def get(self, ticker: str, start: str, end: str, interval: str) -> pd.DataFrame | None:
         path = self._make_path(ticker, start, end, interval)
         if not path.exists():
             return None
@@ -37,9 +32,7 @@ class DataCache:
             path.unlink(missing_ok=True)
             raise CacheError(f"Corrupted cache for {ticker}: {e}") from e
 
-    def put(
-        self, ticker: str, start: str, end: str, interval: str, data: pd.DataFrame
-    ) -> None:
+    def put(self, ticker: str, start: str, end: str, interval: str, data: pd.DataFrame) -> None:
         path = self._make_path(ticker, start, end, interval)
         path.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -51,7 +44,7 @@ class DataCache:
         path = self._make_path(ticker, start, end, interval)
         return path.exists()
 
-    def invalidate(self, ticker: Optional[str] = None) -> int:
+    def invalidate(self, ticker: str | None = None) -> int:
         count = 0
         if ticker:
             ticker_dir = self.cache_dir / ticker

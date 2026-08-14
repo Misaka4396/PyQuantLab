@@ -9,10 +9,11 @@ ETF 套利最大风险是"篮子同步成交困难"。本模块模拟真实执�
 
 执行成本与 A3 一致：本模块不自行发明费率，全部经 CostModel 计费。
 """
+
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -31,13 +32,13 @@ class LegExecution:
 
     symbol: str
     side: str
-    quantity: float            # 目标数量
-    filled_quantity: float     # 实际成交数量
-    unfilled_quantity: float   # 未成交数量
-    ref_price: float           # 基准价（撮合参考价）
-    exec_price: float          # 滑点后成交价（由成本模型）
-    delay_minutes: float       # 成交时延（分钟）
-    is_partial: bool           # 是否部分成交
+    quantity: float  # 目标数量
+    filled_quantity: float  # 实际成交数量
+    unfilled_quantity: float  # 未成交数量
+    ref_price: float  # 基准价（撮合参考价）
+    exec_price: float  # 滑点后成交价（由成本模型）
+    delay_minutes: float  # 成交时延（分钟）
+    is_partial: bool  # 是否部分成交
     total_fee: float = 0.0
     slippage_cost: float = 0.0
 
@@ -61,14 +62,14 @@ class LegExecution:
 class ExecutionResult:
     """一次篮子执行的完整结果。"""
 
-    legs: List[LegExecution] = field(default_factory=list)
-    basket_cost: Optional[BasketCost] = None        # 二级市场成本（A3）
-    creation_redemption: Optional[dict] = None      # 申赎结果（开关开启时有）
-    total_target_value: float = 0.0                 # 目标名义
-    total_filled_value: float = 0.0                 # 实际成交名义
-    total_unfilled_value: float = 0.0               # 未成交名义（敞口）
-    exposure_ratio: float = 0.0                     # 敞口比例 = 未成交 / 目标
-    tracking_error: float = 0.0                     # 跟踪误差（执行缺口加权 std）
+    legs: list[LegExecution] = field(default_factory=list)
+    basket_cost: BasketCost | None = None  # 二级市场成本（A3）
+    creation_redemption: dict | None = None  # 申赎结果（开关开启时有）
+    total_target_value: float = 0.0  # 目标名义
+    total_filled_value: float = 0.0  # 实际成交名义
+    total_unfilled_value: float = 0.0  # 未成交名义（敞口）
+    exposure_ratio: float = 0.0  # 敞口比例 = 未成交 / 目标
+    tracking_error: float = 0.0  # 跟踪误差（执行缺口加权 std）
 
     def to_dataframe(self) -> pd.DataFrame:
         """逐腿执行明细 DataFrame。"""
@@ -105,9 +106,9 @@ def make_basket_legs(
     basket: PCFBasket,
     etf_quantity: float,
     etf_price: float,
-    stock_prices: Dict[str, float],
+    stock_prices: dict[str, float],
     direction: str = "long",
-) -> List[dict]:
+) -> list[dict]:
     """由 PCF 篮子构造套利腿（供 BasketExecutor.execute 使用）。
 
     direction="long"（折价套利）：买 ETF、卖成分股。
@@ -129,8 +130,7 @@ def make_basket_legs(
         px = float(stock_prices.get(c.symbol, np.nan)) if c.symbol in stock_prices else np.nan
         if not np.isfinite(px) or px <= 0 or w <= 0:
             continue
-        legs.append({"symbol": c.symbol, "side": stock_side,
-                     "quantity": basket_notional * w / px})
+        legs.append({"symbol": c.symbol, "side": stock_side, "quantity": basket_notional * w / px})
     return legs
 
 
@@ -139,9 +139,9 @@ class BasketExecutor:
 
     def __init__(
         self,
-        config: Optional[ExecutionConfig] = None,
-        cost_model: Optional[CostModel] = None,
-        seed: Optional[int] = None,
+        config: ExecutionConfig | None = None,
+        cost_model: CostModel | None = None,
+        seed: int | None = None,
     ):
         self.config = config or ExecutionConfig()
         self.config.validate()
@@ -152,10 +152,10 @@ class BasketExecutor:
     def execute(
         self,
         legs: Sequence[dict],
-        prices: Dict[str, float],
-        volumes: Optional[Dict[str, float]] = None,
-        basket: Optional[PCFBasket] = None,
-        etf_symbol: Optional[str] = None,
+        prices: dict[str, float],
+        volumes: dict[str, float] | None = None,
+        basket: PCFBasket | None = None,
+        etf_symbol: str | None = None,
     ) -> ExecutionResult:
         """模拟一次篮子同步执行。
 
@@ -169,7 +169,7 @@ class BasketExecutor:
         volumes = volumes or {}
 
         # 1) 逐笔时延 + 部分成交
-        leg_execs: List[LegExecution] = []
+        leg_execs: list[LegExecution] = []
         for leg in legs:
             sym = str(leg["symbol"])
             side = str(leg["side"]).upper()
@@ -179,15 +179,23 @@ class BasketExecutor:
             is_partial = bool(self._rng.random() < cfg.partial_fill_prob)
             fill_ratio = 1.0
             if is_partial:
-                fill_ratio = float(self._rng.uniform(
-                    cfg.partial_fill_ratio_min, cfg.partial_fill_ratio_max))
+                fill_ratio = float(
+                    self._rng.uniform(cfg.partial_fill_ratio_min, cfg.partial_fill_ratio_max)
+                )
             filled = qty * fill_ratio
-            leg_execs.append(LegExecution(
-                symbol=sym, side=side, quantity=qty,
-                filled_quantity=filled, unfilled_quantity=qty - filled,
-                ref_price=price, exec_price=price,
-                delay_minutes=delay, is_partial=is_partial,
-            ))
+            leg_execs.append(
+                LegExecution(
+                    symbol=sym,
+                    side=side,
+                    quantity=qty,
+                    filled_quantity=filled,
+                    unfilled_quantity=qty - filled,
+                    ref_price=price,
+                    exec_price=price,
+                    delay_minutes=delay,
+                    is_partial=is_partial,
+                )
+            )
 
         # 2) 申赎（可选）：开启且有篮子时输出 AP 申赎结果
         cr = None
@@ -196,11 +204,18 @@ class BasketExecutor:
 
         # 3) 二级市场成本（A3 compute_basket，只对已成交数量计费）
         etf_code = etf_symbol or (basket.etf_code if basket is not None else "")
-        cost_legs = [{
-            "symbol": le.symbol, "side": le.side, "quantity": le.filled_quantity,
-            "price": le.ref_price, "is_etf": le.symbol == etf_code,
-            "volume": float(volumes.get(le.symbol, 0.0)),
-        } for le in leg_execs if le.filled_quantity > 0]
+        cost_legs = [
+            {
+                "symbol": le.symbol,
+                "side": le.side,
+                "quantity": le.filled_quantity,
+                "price": le.ref_price,
+                "is_etf": le.symbol == etf_code,
+                "volume": float(volumes.get(le.symbol, 0.0)),
+            }
+            for le in leg_execs
+            if le.filled_quantity > 0
+        ]
         basket_cost = self.cost_model.compute_basket(cost_legs) if cost_legs else None
 
         # 回填成交价 / 费用到各腿
@@ -214,12 +229,17 @@ class BasketExecutor:
                     le.slippage_cost = b.slippage_cost
 
         # 4) 敞口 / 跟踪误差
-        total_target = sum(abs(le.ref_price * le.quantity)
-                           for le in leg_execs if np.isfinite(le.ref_price))
-        total_filled = sum(abs(le.ref_price * le.filled_quantity)
-                           for le in leg_execs if np.isfinite(le.ref_price))
-        total_unfilled = sum(abs(le.ref_price * le.unfilled_quantity)
-                             for le in leg_execs if np.isfinite(le.ref_price))
+        total_target = sum(
+            abs(le.ref_price * le.quantity) for le in leg_execs if np.isfinite(le.ref_price)
+        )
+        total_filled = sum(
+            abs(le.ref_price * le.filled_quantity) for le in leg_execs if np.isfinite(le.ref_price)
+        )
+        total_unfilled = sum(
+            abs(le.ref_price * le.unfilled_quantity)
+            for le in leg_execs
+            if np.isfinite(le.ref_price)
+        )
         exposure = total_unfilled / total_target if total_target > 0 else 0.0
 
         gaps, weights = [], []
@@ -243,10 +263,10 @@ class BasketExecutor:
     # ------------------------------------------------------------------
     def _creation_redemption(
         self,
-        leg_execs: List[LegExecution],
+        leg_execs: list[LegExecution],
         basket: PCFBasket,
-        etf_symbol: Optional[str],
-    ) -> Optional[dict]:
+        etf_symbol: str | None,
+    ) -> dict | None:
         """AP 实物/现金申赎模拟（ETF 腿）。"""
         cfg = self.config
         etf_leg = None
@@ -260,8 +280,12 @@ class BasketExecutor:
         units = int(etf_leg.quantity // cfg.creation_unit) if cfg.creation_unit > 0 else 0
         if units <= 0:
             return {
-                "type": "insufficient_units", "units": 0, "etf_quantity": 0.0,
-                "fee": 0.0, "cash_component": 0.0, "confirm_day": cfg.confirm_day,
+                "type": "insufficient_units",
+                "units": 0,
+                "etf_quantity": 0.0,
+                "fee": 0.0,
+                "cash_component": 0.0,
+                "confirm_day": cfg.confirm_day,
             }
         typ = "redeem" if etf_leg.side == SELL else "create"
         cash_component = basket.cash_component * units
@@ -278,7 +302,7 @@ class BasketExecutor:
 
 __all__ = [
     "BasketExecutor",
-    "LegExecution",
     "ExecutionResult",
+    "LegExecution",
     "make_basket_legs",
 ]

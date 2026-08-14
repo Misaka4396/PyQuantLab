@@ -8,10 +8,10 @@
 - 重训自动触发（scheduler 逻辑测试）
 - DL/RL 为开关（config 关闭时训练只跑 LightGBM）
 """
+
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import pytest
 import torch
 
@@ -45,8 +45,7 @@ def _synthetic(n: int = 400, f: int = 6, seed: int = 0):
 # ---------------------------------------------------------------------------
 def test_lightgbm_reproducible_same_seed():
     X, y = _synthetic()
-    cfg = TrainConfig(seed=42, task="classification",
-                      use_lightgbm=True, use_dl=False, use_rl=False)
+    cfg = TrainConfig(seed=42, task="classification", use_lightgbm=True, use_dl=False, use_rl=False)
     r1 = train_lightgbm(cfg, X, y)
     r2 = train_lightgbm(cfg, X, y)
     # 同种子同数据两次训练指标一致
@@ -88,7 +87,7 @@ def test_torch_dataset_time_windows_no_future():
     for i in range(len(ds)):
         xi, yi = ds[i]
         # 样本 i 只含窗口 X[i:i+seq_len]，标签取窗口末端（无未来数据）
-        np.testing.assert_array_equal(xi.numpy(), X[i:i + seq_len])
+        np.testing.assert_array_equal(xi.numpy(), X[i : i + seq_len])
         assert yi.item() == pytest.approx(y[i + seq_len - 1])
 
 
@@ -127,8 +126,16 @@ def test_train_torch_model_runs_on_tiny_data():
     X, y = _synthetic(120, f=4)
     y_reg = y.astype(float)
     res = train_torch_from_arrays(
-        X, y_reg, model_name="lstm", seq_len=5, hidden_size=8, num_layers=1,
-        epochs=1, batch_size=16, train_frac=0.8, seed=0,
+        X,
+        y_reg,
+        model_name="lstm",
+        seq_len=5,
+        hidden_size=8,
+        num_layers=1,
+        epochs=1,
+        batch_size=16,
+        train_frac=0.8,
+        seed=0,
     )
     assert "history" in res
     assert len(res["history"]["train_loss"]) == 1
@@ -140,16 +147,30 @@ def test_train_torch_model_runs_on_tiny_data():
 # ---------------------------------------------------------------------------
 def test_registry_version_binding_and_rollback(tmp_path):
     reg = ModelRegistry(tmp_path)
-    v1 = reg.save({"kind": "dummy", "value": 1.0}, {
-        "model_type": "dummy", "task": "regression",
-        "data_version": 1, "feature_version": 1,
-        "hyperparams": {"a": 1}, "seed": 42, "metrics": {"m": 0.1},
-    })
-    v2 = reg.save({"kind": "dummy", "value": 2.0}, {
-        "model_type": "dummy", "task": "regression",
-        "data_version": 2, "feature_version": 1,
-        "hyperparams": {"a": 2}, "seed": 42, "metrics": {"m": 0.2},
-    })
+    v1 = reg.save(
+        {"kind": "dummy", "value": 1.0},
+        {
+            "model_type": "dummy",
+            "task": "regression",
+            "data_version": 1,
+            "feature_version": 1,
+            "hyperparams": {"a": 1},
+            "seed": 42,
+            "metrics": {"m": 0.1},
+        },
+    )
+    v2 = reg.save(
+        {"kind": "dummy", "value": 2.0},
+        {
+            "model_type": "dummy",
+            "task": "regression",
+            "data_version": 2,
+            "feature_version": 1,
+            "hyperparams": {"a": 2},
+            "seed": 42,
+            "metrics": {"m": 0.2},
+        },
+    )
     assert v1 == 1 and v2 == 2
     assert reg.current_version() == 2
 
@@ -179,7 +200,16 @@ def test_retrain_scheduler_triggers_periodically():
     log = sched.run(train_fn, n_steps=10)
     assert calls == [0, 3, 6, 9]
     assert log["retrained"].tolist() == [
-        True, False, False, True, False, False, True, False, False, True,
+        True,
+        False,
+        False,
+        True,
+        False,
+        False,
+        True,
+        False,
+        False,
+        True,
     ]
     assert sched.should_retrain(0) and sched.should_retrain(6)
     assert not sched.should_retrain(1) and not sched.should_retrain(7)
@@ -206,8 +236,14 @@ def test_retrain_scheduler_versioning(tmp_path):
 # ---------------------------------------------------------------------------
 def test_train_dl_rl_disabled_runs_only_lightgbm(tmp_path):
     X, y = _synthetic()
-    cfg = TrainConfig(seed=42, task="classification", use_lightgbm=True,
-                      use_dl=False, use_rl=False, model_dir=str(tmp_path))
+    cfg = TrainConfig(
+        seed=42,
+        task="classification",
+        use_lightgbm=True,
+        use_dl=False,
+        use_rl=False,
+        model_dir=str(tmp_path),
+    )
     res = train(cfg, X, y)
     assert set(res["models"]) == {"lightgbm"}
     assert set(res["versions"]) == {"lightgbm"}
@@ -215,10 +251,19 @@ def test_train_dl_rl_disabled_runs_only_lightgbm(tmp_path):
 
 def test_train_dl_enabled_trains_torch(tmp_path):
     X, y = _synthetic(120, f=4)
-    cfg = TrainConfig(seed=42, task="regression", use_lightgbm=True,
-                      use_dl=True, use_rl=False, model_dir=str(tmp_path),
-                      dl_model="lstm", seq_len=5, hidden_size=8, dl_epochs=1,
-                      batch_size=16)
+    cfg = TrainConfig(
+        seed=42,
+        task="regression",
+        use_lightgbm=True,
+        use_dl=True,
+        use_rl=False,
+        model_dir=str(tmp_path),
+        dl_model="lstm",
+        seq_len=5,
+        hidden_size=8,
+        dl_epochs=1,
+        batch_size=16,
+    )
     res = train(cfg, X, y.astype(float))
     assert set(res["models"]) == {"lightgbm", "torch"}
     assert set(res["versions"]) == {"lightgbm", "torch"}

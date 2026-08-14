@@ -7,13 +7,14 @@
 - 重训时间点明确（输出重训 schedule）
 - OOS 只报告一次（report_oos 二次调用抛错）
 """
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from ml.cv import purged_kfold, fold_table, as_sorted_index
+from ml.cv import as_sorted_index, fold_table, purged_kfold
 from ml.walk_forward import WalkForward
 
 
@@ -48,7 +49,7 @@ def test_purged_kfold_matches_manual():
     embargo, purge = 1, 1
     manual = manual_purged_kfold(times, n_splits=2, embargo=embargo, purge_horizon=purge)
     got = purged_kfold(times, n_splits=2, embargo=embargo, purge_horizon=purge)
-    for (mt, mv), (gt, gv) in zip(manual, got):
+    for (mt, mv), (gt, gv) in zip(manual, got, strict=False):
         np.testing.assert_array_equal(mt, gt)
         np.testing.assert_array_equal(mv, gv)
 
@@ -101,8 +102,9 @@ def _model_fn():
 
 
 def _fit(model, X, y):
-    model["w"] = np.linalg.lstsq(np.asarray(X, dtype=float),
-                                 np.asarray(y, dtype=float), rcond=None)[0]
+    model["w"] = np.linalg.lstsq(
+        np.asarray(X, dtype=float), np.asarray(y, dtype=float), rcond=None
+    )[0]
 
 
 def _predict(model, X):

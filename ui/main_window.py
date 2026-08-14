@@ -2,27 +2,25 @@
 
 import sys
 
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
     QListWidget,
-    QListWidgetItem,
     QMainWindow,
     QStackedWidget,
+    QStatusBar,
     QVBoxLayout,
     QWidget,
-    QStatusBar,
 )
 
-from ui.pages_qt.data_page_qt import DataPage
-from ui.pages_qt.strategy_page_qt import StrategyPage
 from ui.pages_qt.backtest_page_qt import BacktestPage
-from ui.pages_qt.results_page_qt import ResultsPage
-from ui.pages_qt.portfolio_page_qt import PortfolioPage
+from ui.pages_qt.data_page_qt import DataPage
 from ui.pages_qt.live_page_qt import LivePage
+from ui.pages_qt.portfolio_page_qt import PortfolioPage
+from ui.pages_qt.results_page_qt import ResultsPage
+from ui.pages_qt.strategy_page_qt import StrategyPage
 
 FONT_FAMILY = "Microsoft YaHei"
 FONT_SIZE = 13

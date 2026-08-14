@@ -10,6 +10,8 @@
 本 hook 在解释器启动早期执行：将共享目录加入 DLL 搜索路径，
 使 numpy/scipy 等运行时能加载 mkl 数学库（打包时已从各自 _internal 移除）。
 """
+
+import contextlib
 import os
 import sys
 
@@ -35,10 +37,8 @@ def _install():
     common = _locate_common()
     if common is None:
         return  # 无共享目录（如源码环境），跳过
-    try:
+    with contextlib.suppress(Exception):
         os.add_dll_directory(common)  # Python 3.8+ 官方 DLL 搜索机制
-    except Exception:
-        pass
     # 兼容老式 LoadLibrary 搜索顺序
     os.environ["PATH"] = common + os.pathsep + os.environ.get("PATH", "")
 

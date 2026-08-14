@@ -16,10 +16,10 @@
 - 折价（premium < 0，direction=long）：买 ETF、卖篮子。
 - 平仓与开仓相反。
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -27,17 +27,15 @@ import pandas as pd
 from engine import SignalEvent, Strategy
 from etf.basket_execution import BasketExecutor
 from etf.etf_signal import (
-    ACTION_CLOSE,
     ACTION_OPEN,
-    DIR_LONG,
     DIR_SHORT,
     ETFSignalGenerator,
 )
 from etf.threshold_config import ThresholdConfig
 
 # 执行模式
-IDEAL = "ideal"              # 理想执行（满量成交）
-SYNC_RISK = "sync_risk"      # 含同步风险（时延 + 部分成交）
+IDEAL = "ideal"  # 理想执行（满量成交）
+SYNC_RISK = "sync_risk"  # 含同步风险（时延 + 部分成交）
 EXECUTION_MODES = (IDEAL, SYNC_RISK)
 
 
@@ -48,12 +46,12 @@ class ArbitrageExecution:
     ts: pd.Timestamp
     action: str
     direction: str
-    target_value: float       # 目标名义（全部腿满量）
-    filled_value: float       # 实际成交名义
-    unfilled_value: float     # 未成交名义（敞口）
-    exposure_ratio: float     # 敞口比例 = 未成交 / 目标
-    tracking_error: float     # 执行缺口加权标准差
-    n_legs: int               # 腿数
+    target_value: float  # 目标名义（全部腿满量）
+    filled_value: float  # 实际成交名义
+    unfilled_value: float  # 未成交名义（敞口）
+    exposure_ratio: float  # 敞口比例 = 未成交 / 目标
+    tracking_error: float  # 执行缺口加权标准差
+    n_legs: int  # 腿数
     reason: str = ""
 
     def to_dict(self) -> dict:
@@ -71,7 +69,7 @@ class ArbitrageExecution:
         }
 
 
-def _leg_notional(legs: List[dict], prices: Dict[str, float]) -> float:
+def _leg_notional(legs: list[dict], prices: dict[str, float]) -> float:
     """篮子腿的名义价值合计（|价格 × 数量|，缺价跳过）。"""
     total = 0.0
     for leg in legs:
@@ -91,15 +89,17 @@ class ETFArbitrageStrategy(Strategy):
         etf_symbol: str,
         etf_quantity: float = 100_000.0,
         *,
-        basket: Optional[Dict[str, float]] = None,
+        basket: dict[str, float] | None = None,
         execution_mode: str = IDEAL,
-        executor: Optional[BasketExecutor] = None,
-        threshold_config: Optional[ThresholdConfig] = None,
-        unit_cost_rate: Optional[float] = None,
+        executor: BasketExecutor | None = None,
+        threshold_config: ThresholdConfig | None = None,
+        unit_cost_rate: float | None = None,
         seed: int = 42,
     ):
         if execution_mode not in EXECUTION_MODES:
-            raise ValueError(f"execution_mode 必须为 {EXECUTION_MODES} 之一，得到 {execution_mode!r}")
+            raise ValueError(
+                f"execution_mode 必须为 {EXECUTION_MODES} 之一，得到 {execution_mode!r}"
+            )
         self.etf_symbol = str(etf_symbol)
         self.etf_quantity = float(etf_quantity)
         self.basket = dict(basket) if basket else None
@@ -107,26 +107,24 @@ class ETFArbitrageStrategy(Strategy):
         self.seed = int(seed)
 
         # 预生成 B2 信号事件流（无前视）
-        gen = ETFSignalGenerator(
-            config=threshold_config, unit_cost_rate=unit_cost_rate
-        )
+        gen = ETFSignalGenerator(config=threshold_config, unit_cost_rate=unit_cost_rate)
         self.signals: pd.DataFrame = gen.generate(premium)
-        self._signal_map: Dict[pd.Timestamp, pd.Series] = {}
+        self._signal_map: dict[pd.Timestamp, pd.Series] = {}
         for _, row in self.signals.iterrows():
             self._signal_map[pd.Timestamp(row["ts"])] = row
 
         # B3 执行器（真实模式挂载；理想模式不使用）
         if execution_mode == SYNC_RISK:
-            self.executor: Optional[BasketExecutor] = executor or BasketExecutor(seed=seed)
+            self.executor: BasketExecutor | None = executor or BasketExecutor(seed=seed)
         else:
             self.executor = None
 
         # 最近已知价格/成交量（供执行器与名义估算）
-        self._last_prices: Dict[str, float] = {}
-        self._last_volumes: Dict[str, float] = {}
+        self._last_prices: dict[str, float] = {}
+        self._last_volumes: dict[str, float] = {}
 
         # 执行记录（风险/容量/报告用）
-        self.executions: List[ArbitrageExecution] = []
+        self.executions: list[ArbitrageExecution] = []
 
     # ------------------------------------------------------------------
     # A2 插件入口
@@ -136,7 +134,7 @@ class ETFArbitrageStrategy(Strategy):
         timestamp: pd.Timestamp,
         bars,
         portfolio,
-    ) -> List[SignalEvent]:
+    ) -> list[SignalEvent]:
         # 维护最近价格/成交量（执行器与名义估算）
         for sym, bar in bars.items():
             self._last_prices[str(sym)] = float(bar.close)
@@ -150,7 +148,7 @@ class ETFArbitrageStrategy(Strategy):
     # ------------------------------------------------------------------
     # 信号 → 订单
     # ------------------------------------------------------------------
-    def _orders_for_signal(self, ts: pd.Timestamp, row: pd.Series) -> List[SignalEvent]:
+    def _orders_for_signal(self, ts: pd.Timestamp, row: pd.Series) -> list[SignalEvent]:
         action = str(row["action"])
         direction = str(row["direction"])
         reason = str(row.get("threshold_basis", ""))
@@ -176,7 +174,8 @@ class ETFArbitrageStrategy(Strategy):
             )
             filled_legs = [
                 {"symbol": le.symbol, "side": le.side, "quantity": le.filled_quantity}
-                for le in result.legs if le.filled_quantity > 0
+                for le in result.legs
+                if le.filled_quantity > 0
             ]
             target_value = result.total_target_value
             filled_value = result.total_filled_value
@@ -184,26 +183,36 @@ class ETFArbitrageStrategy(Strategy):
             exposure_ratio = result.exposure_ratio
             tracking_error = result.tracking_error
 
-        self.executions.append(ArbitrageExecution(
-            ts=ts, action=action, direction=direction,
-            target_value=target_value, filled_value=filled_value,
-            unfilled_value=unfilled_value, exposure_ratio=exposure_ratio,
-            tracking_error=tracking_error, n_legs=len(filled_legs), reason=reason,
-        ))
-
-        events: List[SignalEvent] = []
-        for leg in filled_legs:
-            events.append(SignalEvent(
-                timestamp=ts,
-                symbol=str(leg["symbol"]),
-                side=str(leg["side"]).upper(),
-                quantity=float(leg["quantity"]),
-                order_type="market",
+        self.executions.append(
+            ArbitrageExecution(
+                ts=ts,
+                action=action,
+                direction=direction,
+                target_value=target_value,
+                filled_value=filled_value,
+                unfilled_value=unfilled_value,
+                exposure_ratio=exposure_ratio,
+                tracking_error=tracking_error,
+                n_legs=len(filled_legs),
                 reason=reason,
-            ))
+            )
+        )
+
+        events: list[SignalEvent] = []
+        for leg in filled_legs:
+            events.append(
+                SignalEvent(
+                    timestamp=ts,
+                    symbol=str(leg["symbol"]),
+                    side=str(leg["side"]).upper(),
+                    quantity=float(leg["quantity"]),
+                    order_type="market",
+                    reason=reason,
+                )
+            )
         return events
 
-    def _build_legs(self, action: str, direction: str) -> List[dict]:
+    def _build_legs(self, action: str, direction: str) -> list[dict]:
         """按方向构造套利腿（ETF 腿 + 可选篮子成分腿）。"""
         if action == ACTION_OPEN:
             etf_side = "SELL" if direction == DIR_SHORT else "BUY"
@@ -224,17 +233,27 @@ class ETFArbitrageStrategy(Strategy):
     def exposure_frame(self) -> pd.DataFrame:
         """逐笔执行记录 DataFrame。"""
         if not self.executions:
-            return pd.DataFrame(columns=[
-                "ts", "action", "direction", "target_value", "filled_value",
-                "unfilled_value", "exposure_ratio", "tracking_error", "n_legs", "reason",
-            ])
+            return pd.DataFrame(
+                columns=[
+                    "ts",
+                    "action",
+                    "direction",
+                    "target_value",
+                    "filled_value",
+                    "unfilled_value",
+                    "exposure_ratio",
+                    "tracking_error",
+                    "n_legs",
+                    "reason",
+                ]
+            )
         return pd.DataFrame([e.to_dict() for e in self.executions])
 
 
 __all__ = [
-    "ETFArbitrageStrategy",
-    "ArbitrageExecution",
+    "EXECUTION_MODES",
     "IDEAL",
     "SYNC_RISK",
-    "EXECUTION_MODES",
+    "ArbitrageExecution",
+    "ETFArbitrageStrategy",
 ]

@@ -7,6 +7,7 @@
 - 特征重要性跨折稳定性（一致 → 1；反转 → 负相关）
 - 过拟合风险结论（含阈值）与报告生成
 """
+
 from __future__ import annotations
 
 import math
@@ -15,19 +16,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from ml.feature_importance import feature_importance_stability, to_rank_series
 from ml.overfit import (
     DSR_HIGH_RISK,
     DSR_SAFE,
+    assess_overfitting,
+    conclude_overfitting,
     cscv,
     cscv_splits,
-    conclude_overfitting,
     deflated_sharpe_ratio,
     dsr_from_returns,
-    assess_overfitting,
     sharpe_standard_error,
     skewness_kurtosis,
 )
-from ml.feature_importance import feature_importance_stability, to_rank_series
 from ml.overfit_report import generate_overfit_report, render_overfit_report
 
 
@@ -87,7 +88,11 @@ def test_dsr_decreases_with_trials():
 
 def test_dsr_in_unit_interval():
     """DSR 是概率，必然落在 [0, 1]。"""
-    for returns in ([0.01, 0.02, -0.01, 0.015, 0.005], [-0.02, 0.01, 0.03, -0.01, 0.02], [0.1, -0.1, 0.1, -0.1]):
+    for returns in (
+        [0.01, 0.02, -0.01, 0.015, 0.005],
+        [-0.02, 0.01, 0.03, -0.01, 0.02],
+        [0.1, -0.1, 0.1, -0.1],
+    ):
         d = dsr_from_returns(returns, trials=3, risk_free_rate=0.0)["dsr"]
         assert 0.0 <= d <= 1.0
 
@@ -182,8 +187,12 @@ def test_assess_overfitting_high_risk_from_dsr_and_pbo():
     returns = [-0.0385, 0.024, -0.0469, 0.0164, -0.0484]
     M = np.array([[10, 0], [10, 0], [0, 5], [0, 5]], dtype=float)  # PBO=1
     a = assess_overfitting(
-        is_equity=is_eq, oos_equity=oos_eq, returns=returns, trials=10,
-        performance_matrix=M, n_submatrices=2,
+        is_equity=is_eq,
+        oos_equity=oos_eq,
+        returns=returns,
+        trials=10,
+        performance_matrix=M,
+        n_submatrices=2,
     )
     assert a.risk_level == "高"
     assert "不建议上线" in a.recommendation
@@ -196,7 +205,9 @@ def test_assess_overfitting_low_risk():
     returns = [0.05, 0.06, 0.04, 0.05, 0.06, 0.04]
     eq = eq_from_returns([0.05, 0.057, 0.045, 0.0517, 0.0492])
     M = np.array([[10, 0], [10, 0], [10, 0], [0, 5]], dtype=float)  # PBO=0
-    a = assess_overfitting(is_equity=eq, oos_equity=eq, returns=returns, trials=1, performance_matrix=M)
+    a = assess_overfitting(
+        is_equity=eq, oos_equity=eq, returns=returns, trials=1, performance_matrix=M
+    )
     assert a.risk_level == "低"
     assert "可上线" in a.recommendation
     assert a.dsr >= DSR_SAFE
@@ -226,10 +237,12 @@ def test_feature_importance_stability_identical():
 
 def test_feature_importance_stability_reversed():
     """重要性反转 → 负相关、稳定性评分截断为 0。"""
-    res = feature_importance_stability([
-        {"a": 0.5, "b": 0.3, "c": 0.2},
-        {"a": 0.1, "b": 0.3, "c": 0.5},
-    ])
+    res = feature_importance_stability(
+        [
+            {"a": 0.5, "b": 0.3, "c": 0.2},
+            {"a": 0.1, "b": 0.3, "c": 0.5},
+        ]
+    )
     assert res["mean_correlation"] == pytest.approx(-1.0)
     assert res["stability_score"] == pytest.approx(0.0)
 
@@ -248,13 +261,18 @@ def test_to_rank_series_accepts_dataframe():
 def test_overfit_report_contains_thresholds_and_conclusion(tmp_path):
     is_eq = eq_from_returns([0.1, -0.018, 0.111, -0.0167, 0.1017])
     oos_eq = eq_from_returns([-0.0385, 0.024, -0.0469, 0.0164, -0.0484], start=is_eq.iloc[-1])
-    a = assess_overfitting(is_equity=is_eq, oos_equity=oos_eq, returns=[-0.0385, 0.024, -0.0469, 0.0164, -0.0484], trials=10)
+    a = assess_overfitting(
+        is_equity=is_eq,
+        oos_equity=oos_eq,
+        returns=[-0.0385, 0.024, -0.0469, 0.0164, -0.0484],
+        trials=10,
+    )
     text = render_overfit_report(a)
     assert "判定阈值" in text
     assert str(DSR_SAFE) in text
     assert "不建议上线" in text
     assert a.risk_level in text
 
-    path = generate_overfit_report(a, tmp_path, name="overfit")
+    generate_overfit_report(a, tmp_path, name="overfit")
     assert (tmp_path / "overfit.md").exists()
     assert "Deflated Sharpe" in (tmp_path / "overfit.md").read_text(encoding="utf-8")

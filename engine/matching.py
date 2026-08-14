@@ -4,9 +4,10 @@
 接口（``CostModelLike``）计算滑点后的成交价与费用，生成 FillEvent。撮合器不
 import cost_model.py，只依赖接口约定。
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 from engine.events import FillEvent, MarketDataEvent
 from engine.order import Order, OrderSide, OrderType
@@ -53,7 +54,7 @@ class MatchingEngine:
         order: Order,
         bar: MarketDataEvent,
         is_etf: bool = False,
-    ) -> Optional[FillEvent]:
+    ) -> FillEvent | None:
         """对订单在给定 bar 上撮合，返回 FillEvent 或 None（限价未成交）。"""
         ref_price = float(bar.open)
 

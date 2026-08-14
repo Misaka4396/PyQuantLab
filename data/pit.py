@@ -5,26 +5,26 @@
 - 在任意时点 T 做决策/回测时，只能使用 ``as_of <= T`` 的数据（slice_as_of）。
 - 复权因子只在除权除息生效日（ex_date）之后才生效；查询时点之前的未来因子不得参与计算。
 """
+
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Union
 
 import pandas as pd
 
 from core.exceptions import DataError
 from data import schemas as sc
 
-DateLike = Union[str, datetime, pd.Timestamp]
+DateLike = str | datetime | pd.Timestamp
 
 __all__ = [
-    "normalize_timestamps",
-    "as_of_mask",
-    "slice_as_of",
     "as_of_barrier",
+    "as_of_mask",
+    "backward_adjust",
     "compute_adj_factor",
     "forward_adjust",
-    "backward_adjust",
+    "normalize_timestamps",
+    "slice_as_of",
 ]
 
 
@@ -109,7 +109,7 @@ def _align_factor(adj_factor: pd.Series, target_index: pd.DatetimeIndex) -> pd.S
     return adj_factor.reindex(combined).ffill().reindex(target).fillna(1.0)
 
 
-def _coerce_factor(adj_factor: Union[pd.Series, pd.DataFrame]) -> pd.Series:
+def _coerce_factor(adj_factor: pd.Series | pd.DataFrame) -> pd.Series:
     """接受 Series 或 DataFrame（取 adj_factor 列），返回排序后的累计因子 Series。"""
     if isinstance(adj_factor, pd.DataFrame):
         if sc.COL_ADJ_FACTOR not in adj_factor.columns:
@@ -120,8 +120,8 @@ def _coerce_factor(adj_factor: Union[pd.Series, pd.DataFrame]) -> pd.Series:
 
 def forward_adjust(
     prices: pd.Series,
-    adj_factor: Union[pd.Series, pd.DataFrame],
-    as_of: Optional[DateLike] = None,
+    adj_factor: pd.Series | pd.DataFrame,
+    as_of: DateLike | None = None,
 ) -> pd.Series:
     """前复权：qfq_t = price_t * f_end / f_t。
 
@@ -142,8 +142,8 @@ def forward_adjust(
 
 def backward_adjust(
     prices: pd.Series,
-    adj_factor: Union[pd.Series, pd.DataFrame],
-    as_of: Optional[DateLike] = None,
+    adj_factor: pd.Series | pd.DataFrame,
+    as_of: DateLike | None = None,
 ) -> pd.Series:
     """后复权：hfq_t = price_t / f_t（约定除权前因子 f_0 = 1）。"""
     prices = pd.Series(prices)

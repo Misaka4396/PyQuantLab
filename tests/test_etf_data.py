@@ -8,6 +8,7 @@
 - 折溢价计算（盘中/收盘，手算对照）
 - 停牌/涨跌停成分股识别
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,21 +16,21 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from etf.etf_data import (
+    ETFDataService,
+    mark_untradeable_constituents,
+    premium_close,
+    premium_intraday,
+    synthetic_etf_minute,
+)
+from etf.iopv_estimator import IOPVEstimator
 from etf.pcf_parser import (
     PCFBasket,
     PCFConstituent,
+    next_trading_day,
     parse_pcf,
     parse_pcf_file,
     pcf_from_dataframe,
-    next_trading_day,
-)
-from etf.iopv_estimator import IOPVEstimator
-from etf.etf_data import (
-    premium_intraday,
-    premium_close,
-    mark_untradeable_constituents,
-    synthetic_etf_minute,
-    ETFDataService,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -54,11 +55,18 @@ def make_ohlcv(index, opens, closes, volumes):
     """构造单标的 OHLCV DataFrame（index=datetime）。"""
     idx = pd.to_datetime(index)
     opens, closes = list(opens), list(closes)
-    high = [max(o, c) for o, c in zip(opens, closes)]
-    low = [min(o, c) for o, c in zip(opens, closes)]
-    return pd.DataFrame({
-        "open": opens, "high": high, "low": low, "close": closes, "volume": list(volumes),
-    }, index=idx)
+    high = [max(o, c) for o, c in zip(opens, closes, strict=False)]
+    low = [min(o, c) for o, c in zip(opens, closes, strict=False)]
+    return pd.DataFrame(
+        {
+            "open": opens,
+            "high": high,
+            "low": low,
+            "close": closes,
+            "volume": list(volumes),
+        },
+        index=idx,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -99,8 +107,11 @@ def test_pcf_effective_next_trading_day():
     assert b1.effective_date == pd.Timestamp("2024-01-03")
 
     # 周五 2024-01-05 → 下周一 2024-01-08
-    b2 = parse_pcf(PCF_TEXT.replace("清单日期=20240102", "清单日期=20240105")
-                        .replace("生效日期=20240103\n", ""))
+    b2 = parse_pcf(
+        PCF_TEXT.replace("清单日期=20240102", "清单日期=20240105").replace(
+            "生效日期=20240103\n", ""
+        )
+    )
     assert b2.effective_date == pd.Timestamp("2024-01-08")
 
 
@@ -112,8 +123,9 @@ def test_next_trading_day_with_calendar():
 
 def test_pcf_from_dataframe():
     df = pd.DataFrame({"symbol": ["600000", "600036"], "quantity": [1000.0, 500.0]})
-    basket = pcf_from_dataframe(df, etf_code="510300", trade_date="2024-01-02",
-                                creation_unit=900000.0, cash_component=0.0)
+    basket = pcf_from_dataframe(
+        df, etf_code="510300", trade_date="2024-01-02", creation_unit=900000.0, cash_component=0.0
+    )
     assert basket.effective_date == pd.Timestamp("2024-01-03")
     assert len(basket.constituents) == 2
 
@@ -178,9 +190,11 @@ def test_premium_intraday_and_close():
 # ---------------------------------------------------------------------------
 def test_mark_untradeable_constituents():
     basket = PCFBasket(
-        etf_code="510300", trade_date=pd.Timestamp("2024-01-02"),
+        etf_code="510300",
+        trade_date=pd.Timestamp("2024-01-02"),
         effective_date=pd.Timestamp("2024-01-03"),
-        creation_unit=1000.0, cash_component=0.0,
+        creation_unit=1000.0,
+        cash_component=0.0,
         constituents=[
             PCFConstituent(symbol="A", quantity=100.0),  # 正常
             PCFConstituent(symbol="B", quantity=100.0),  # 停牌
@@ -189,8 +203,10 @@ def test_mark_untradeable_constituents():
     )
     quotes = {
         "A": make_ohlcv(["2024-01-02", "2024-01-03"], [10.0, 10.1], [10.0, 10.1], [1000.0, 1000.0]),
-        "B": make_ohlcv(["2024-01-02", "2024-01-03"], [5.0, 5.0], [5.0, 5.0], [0.0, 0.0]),   # 停牌
-        "C": make_ohlcv(["2024-01-02", "2024-01-03"], [10.0, 11.0], [10.0, 11.0], [1000.0, 1000.0]),  # 涨停
+        "B": make_ohlcv(["2024-01-02", "2024-01-03"], [5.0, 5.0], [5.0, 5.0], [0.0, 0.0]),  # 停牌
+        "C": make_ohlcv(
+            ["2024-01-02", "2024-01-03"], [10.0, 11.0], [10.0, 11.0], [1000.0, 1000.0]
+        ),  # 涨停
     }
     df = mark_untradeable_constituents(basket, quotes)
     by_sym = df.set_index("symbol")

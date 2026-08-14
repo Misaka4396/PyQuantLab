@@ -1,7 +1,5 @@
 """Performance metrics calculator — all static methods, independently testable."""
 
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
@@ -16,8 +14,8 @@ class MetricsCalculator:
     def compute_all(
         equity_curve: pd.DataFrame,
         trades: pd.DataFrame,
-        benchmark_returns: Optional[pd.Series] = None,
-        strategy_returns: Optional[pd.Series] = None,
+        benchmark_returns: pd.Series | None = None,
+        strategy_returns: pd.Series | None = None,
     ) -> PerformanceMetrics:
         if strategy_returns is None:
             strategy_returns = equity_curve["returns"]
@@ -119,9 +117,7 @@ class MetricsCalculator:
         return ann_return / abs(max_dd)
 
     @staticmethod
-    def alpha_beta(
-        returns: pd.Series, benchmark: pd.Series, rf: float = RISK_FREE_RATE
-    ) -> tuple:
+    def alpha_beta(returns: pd.Series, benchmark: pd.Series, rf: float = RISK_FREE_RATE) -> tuple:
         aligned = pd.concat([returns, benchmark], axis=1).dropna()
         if len(aligned) < 2:
             return 0.0, 0.0
@@ -131,8 +127,10 @@ class MetricsCalculator:
         if cov[1, 1] == 0:
             return 0.0, 0.0
         beta = cov[0, 1] / cov[1, 1]
-        alpha = r.mean() - rf / MetricsCalculator.TRADING_DAYS - beta * (
-            b.mean() - rf / MetricsCalculator.TRADING_DAYS
+        alpha = (
+            r.mean()
+            - rf / MetricsCalculator.TRADING_DAYS
+            - beta * (b.mean() - rf / MetricsCalculator.TRADING_DAYS)
         )
         return float(alpha * MetricsCalculator.TRADING_DAYS), float(beta)
 
@@ -152,8 +150,15 @@ class MetricsCalculator:
     def trade_statistics(trades: pd.DataFrame) -> dict:
         total = len(trades)
         if total == 0:
-            return {"total_trades": 0, "winning_trades": 0, "losing_trades": 0,
-                    "win_rate": 0.0, "profit_factor": 0.0, "avg_win": 0.0, "avg_loss": 0.0}
+            return {
+                "total_trades": 0,
+                "winning_trades": 0,
+                "losing_trades": 0,
+                "win_rate": 0.0,
+                "profit_factor": 0.0,
+                "avg_win": 0.0,
+                "avg_loss": 0.0,
+            }
 
         wins = trades[trades["win"]]
         losses = trades[~trades["win"]]

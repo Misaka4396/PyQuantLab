@@ -8,6 +8,7 @@
 元数据绑定：``data_version`` / ``feature_version`` / ``hyperparams``（含哈希），
 保证"模型 ↔ 数据 ↔ 特征 ↔ 超参"可追溯；``rollback`` 加载历史版本并把当前指针切回。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -15,13 +16,13 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import joblib
 import pandas as pd
 
 
-def hyperparams_hash(hyperparams: Dict) -> str:
+def hyperparams_hash(hyperparams: dict) -> str:
     """超参哈希（模型与超参版本绑定用）。"""
     payload = json.dumps(hyperparams, sort_keys=True, default=str, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
@@ -36,9 +37,9 @@ class ModelMeta:
     task: str
     data_version: int
     feature_version: int
-    hyperparams: Dict = field(default_factory=dict)
+    hyperparams: dict = field(default_factory=dict)
     seed: int = 0
-    metrics: Dict = field(default_factory=dict)
+    metrics: dict = field(default_factory=dict)
     created_at: str = ""
     hyperparams_hash: str = ""
 
@@ -60,13 +61,13 @@ class ModelMeta:
 class ModelRegistry:
     """模型版本仓库（保存 / 加载 / 回滚 / 列表）。"""
 
-    def __init__(self, root: Union[str, Path] = "./data_cache/models"):
+    def __init__(self, root: str | Path = "./data_cache/models"):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self._index_path = self.root / "_registry.json"
 
     # ------------------------------------------------------------------
-    def save(self, model: Any, meta: Dict) -> int:
+    def save(self, model: Any, meta: dict) -> int:
         """保存模型与元数据，返回新版本号（并设为当前版本）。"""
         index = self._load_index()
         version = max((int(k) for k in index["versions"]), default=0) + 1
@@ -93,7 +94,7 @@ class ModelRegistry:
         return version
 
     # ------------------------------------------------------------------
-    def load(self, version: int) -> Tuple[Any, dict]:
+    def load(self, version: int) -> tuple[Any, dict]:
         """加载指定版本，返回 (模型, 元数据 dict)。"""
         index = self._load_index()
         key = str(version)
@@ -103,7 +104,7 @@ class ModelRegistry:
         model = self._load_model(self.root / rec["file"])
         return model, rec
 
-    def rollback(self, version: int) -> Tuple[Any, dict]:
+    def rollback(self, version: int) -> tuple[Any, dict]:
         """回滚到历史版本：加载并把当前版本指针切回。"""
         model, meta = self.load(version)
         index = self._load_index()
@@ -111,12 +112,12 @@ class ModelRegistry:
         self._write_index(index)
         return model, meta
 
-    def current_version(self) -> Optional[int]:
+    def current_version(self) -> int | None:
         """返回当前版本号（无则 None）。"""
         cur = self._load_index().get("current")
         return int(cur) if cur is not None else None
 
-    def latest_version(self) -> Optional[int]:
+    def latest_version(self) -> int | None:
         """返回最新（最大）版本号。"""
         versions = list(self._load_index()["versions"].keys())
         return max(int(v) for v in versions) if versions else None
@@ -127,17 +128,19 @@ class ModelRegistry:
         rows = []
         for v in sorted(index["versions"], key=int):
             rec = index["versions"][v]
-            rows.append({
-                "version": rec["version"],
-                "model_type": rec["model_type"],
-                "task": rec["task"],
-                "data_version": rec["data_version"],
-                "feature_version": rec["feature_version"],
-                "seed": rec["seed"],
-                "hyperparams_hash": rec["hyperparams_hash"],
-                "metrics": rec["metrics"],
-                "created_at": rec["created_at"],
-            })
+            rows.append(
+                {
+                    "version": rec["version"],
+                    "model_type": rec["model_type"],
+                    "task": rec["task"],
+                    "data_version": rec["data_version"],
+                    "feature_version": rec["feature_version"],
+                    "seed": rec["seed"],
+                    "hyperparams_hash": rec["hyperparams_hash"],
+                    "metrics": rec["metrics"],
+                    "created_at": rec["created_at"],
+                }
+            )
         return pd.DataFrame(rows)
 
     # ------------------------------------------------------------------
@@ -187,7 +190,7 @@ def torch_load_state(path: Path):
 
 
 __all__ = [
-    "ModelRegistry",
     "ModelMeta",
+    "ModelRegistry",
     "hyperparams_hash",
 ]

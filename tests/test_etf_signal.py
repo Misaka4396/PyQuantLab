@@ -8,6 +8,7 @@
 - 止损 / 均值回归平仓
 - 网格优化只在样本内寻优，输出参数-绩效表并注明过拟合风险
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -16,20 +17,20 @@ import pytest
 
 from cost_config import CostConfig
 from cost_model import CostModel
-from etf.threshold_config import ThresholdConfig
 from etf.etf_signal import (
-    ETFSignalGenerator,
-    rolling_zscore,
-    rolling_quantile,
-    entry_threshold,
-    round_trip_cost_rate,
-    signal_to_engine_events,
-    ACTION_OPEN,
     ACTION_CLOSE,
+    ACTION_OPEN,
     DIR_LONG,
     DIR_SHORT,
+    ETFSignalGenerator,
+    entry_threshold,
+    rolling_quantile,
+    rolling_zscore,
+    round_trip_cost_rate,
+    signal_to_engine_events,
 )
-from etf.signal_grid import grid_search, evaluate_signals
+from etf.signal_grid import evaluate_signals, grid_search
+from etf.threshold_config import ThresholdConfig
 
 
 def _minute_index(n: int) -> pd.DatetimeIndex:
@@ -45,7 +46,7 @@ def test_rolling_zscore_matches_manual_causal():
     z = rolling_zscore(premium, window=3)
     assert z.iloc[:2].isna().all()  # warmup
     for i in range(2, 10):
-        w = premium.iloc[i - 2:i + 1]
+        w = premium.iloc[i - 2 : i + 1]
         expected = (w.iloc[-1] - w.mean()) / w.std(ddof=1)
         assert z.iloc[i] == pytest.approx(expected)
 
@@ -56,7 +57,7 @@ def test_rolling_quantile_matches_manual_causal():
     q = rolling_quantile(premium, window=3)
     assert q.iloc[:2].isna().all()
     for i in range(2, 10):
-        w = premium.iloc[i - 2:i + 1]
+        w = premium.iloc[i - 2 : i + 1]
         expected = float((w <= w.iloc[-1]).mean())
         assert q.iloc[i] == pytest.approx(expected)
 
@@ -89,10 +90,16 @@ def test_entry_threshold_covers_cost():
 
 
 def test_round_trip_cost_rate_uses_a3():
-    model = CostModel(CostConfig(
-        commission_rate=0.001, min_commission=0.0, stamp_tax_rate=0.0,
-        transfer_fee_rate=0.0, spread_rate=0.002, impact_coef=0.0,
-    ))
+    model = CostModel(
+        CostConfig(
+            commission_rate=0.001,
+            min_commission=0.0,
+            stamp_tax_rate=0.0,
+            transfer_fee_rate=0.0,
+            spread_rate=0.002,
+            impact_coef=0.0,
+        )
+    )
     rate = round_trip_cost_rate(model, price=10.0, quantity=1000, is_etf=False, volume=0.0)
     # 买+卖总成本 40 元 / 双边成交额 20000 = 0.002
     assert rate == pytest.approx(0.002)
@@ -125,9 +132,9 @@ def test_direction_premium_short_discount_long():
     gen = ETFSignalGenerator(cfg, unit_cost_rate=0.0)
     df = gen.generate(premium)
     opens = df[df["action"] == ACTION_OPEN]
-    assert opens.iloc[0]["direction"] == DIR_SHORT       # 溢价 → 卖 ETF
+    assert opens.iloc[0]["direction"] == DIR_SHORT  # 溢价 → 卖 ETF
     assert opens.iloc[0]["etf_side"] == "SELL"
-    assert (opens["direction"] == DIR_LONG).any()        # 折价 → 买 ETF
+    assert (opens["direction"] == DIR_LONG).any()  # 折价 → 买 ETF
 
 
 def test_stop_loss_close_event():
@@ -136,8 +143,14 @@ def test_stop_loss_close_event():
     noise = rng.normal(0, 1e-5, 120)
     base = np.where(np.arange(120) < 60, -0.010, -0.020)  # 折价加深（对 long 不利）
     premium = pd.Series(base + noise, index=idx)
-    cfg = ThresholdConfig(zscore_window=10, use_quantile=False, zscore_entry=0.0,
-                          entry_buffer=0.0, stop_loss_bp=50.0, zscore_exit=10.0)
+    cfg = ThresholdConfig(
+        zscore_window=10,
+        use_quantile=False,
+        zscore_entry=0.0,
+        entry_buffer=0.0,
+        stop_loss_bp=50.0,
+        zscore_exit=10.0,
+    )
     gen = ETFSignalGenerator(cfg, unit_cost_rate=0.0)
     df = gen.generate(premium)
     closes = df[df["action"] == ACTION_CLOSE]
@@ -150,18 +163,25 @@ def test_stop_loss_close_event():
 # ---------------------------------------------------------------------------
 def test_signal_to_engine_events_direction():
     row = {
-        "ts": pd.Timestamp("2024-01-02 10:00"), "action": "open", "direction": "short",
-        "threshold_basis": "x", "premium": 0.01, "zscore": 2.0, "quantile": 0.99,
+        "ts": pd.Timestamp("2024-01-02 10:00"),
+        "action": "open",
+        "direction": "short",
+        "threshold_basis": "x",
+        "premium": 0.01,
+        "zscore": 2.0,
+        "quantile": 0.99,
     }
-    events = signal_to_engine_events(row, etf_symbol="510300", quantity=1000,
-                                     basket={"600000": 500})
+    events = signal_to_engine_events(
+        row, etf_symbol="510300", quantity=1000, basket={"600000": 500}
+    )
     assert events[0].symbol == "510300" and events[0].side == "SELL"
     assert events[1].symbol == "600000" and events[1].side == "BUY"
 
     # 平仓反向
     row_close = {**row, "action": "close"}
-    events2 = signal_to_engine_events(row_close, etf_symbol="510300", quantity=1000,
-                                      basket={"600000": 500})
+    events2 = signal_to_engine_events(
+        row_close, etf_symbol="510300", quantity=1000, basket={"600000": 500}
+    )
     assert events2[0].side == "BUY"
     assert events2[1].side == "SELL"
 
@@ -171,12 +191,14 @@ def test_signal_to_engine_events_direction():
 # ---------------------------------------------------------------------------
 def test_evaluate_signals_round_trip_pnl():
     idx = _minute_index(4)
-    signals = pd.DataFrame({
-        "ts": idx,
-        "action": [ACTION_OPEN, ACTION_CLOSE, ACTION_OPEN, ACTION_CLOSE],
-        "direction": [DIR_LONG, DIR_LONG, DIR_SHORT, DIR_SHORT],
-        "premium": [-0.010, -0.001, 0.010, 0.001],
-    })
+    signals = pd.DataFrame(
+        {
+            "ts": idx,
+            "action": [ACTION_OPEN, ACTION_CLOSE, ACTION_OPEN, ACTION_CLOSE],
+            "direction": [DIR_LONG, DIR_LONG, DIR_SHORT, DIR_SHORT],
+            "premium": [-0.010, -0.001, 0.010, 0.001],
+        }
+    )
     m = evaluate_signals(signals, unit_cost_rate=0.001)
     # long: -0.001 - (-0.010) - 0.001 = 0.008；short: 0.010 - 0.001 - 0.001 = 0.008
     assert m["n_trades"] == 2
@@ -189,9 +211,15 @@ def test_grid_search_in_sample_optimization():
     premium = pd.Series(np.sin(np.linspace(0, 30, 300)) * 0.004, index=idx)
     base = ThresholdConfig(use_quantile=False, zscore_window=20)
     res = grid_search(
-        premium, unit_cost_rate=0.0005, base_config=base, split_ratio=0.7,
-        grid={"zscore_entry": (0.5, 1.0), "entry_buffer": (0.0, 0.0005),
-              "stop_loss_bp": (30.0, 50.0)},
+        premium,
+        unit_cost_rate=0.0005,
+        base_config=base,
+        split_ratio=0.7,
+        grid={
+            "zscore_entry": (0.5, 1.0),
+            "entry_buffer": (0.0, 0.0005),
+            "stop_loss_bp": (30.0, 50.0),
+        },
     )
     assert not res.param_table.empty
     for col in ("zscore_entry", "entry_buffer", "stop_loss_bp", "total_return", "n_trades"):

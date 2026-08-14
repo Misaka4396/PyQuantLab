@@ -4,14 +4,12 @@
 - 固定 ``random_state``、``n_jobs=1``、``deterministic=True``、``force_row_wise=True``。
 - 同种子同数据两次训练，指标与预测完全一致。
 """
+
 from __future__ import annotations
 
-from typing import Dict, Optional, Union
-
+import lightgbm as lgb
 import numpy as np
 import pandas as pd
-
-import lightgbm as lgb
 
 from ml.run_config import TASK_CLASSIFICATION, TASK_REGRESSION
 
@@ -40,7 +38,7 @@ class LightGBMModel:
     def __init__(
         self,
         task: str = TASK_CLASSIFICATION,
-        params: Optional[Dict] = None,
+        params: dict | None = None,
         seed: int = 42,
     ):
         if task not in (TASK_CLASSIFICATION, TASK_REGRESSION):
@@ -49,10 +47,10 @@ class LightGBMModel:
         self.seed = int(seed)
         self.params = {**_base_params(seed), **(params or {})}
         self.model = None
-        self.feature_names_: Optional[list] = None
+        self.feature_names_: list | None = None
 
     # ------------------------------------------------------------------
-    def fit(self, X, y) -> "LightGBMModel":
+    def fit(self, X, y) -> LightGBMModel:
         """训练。y 为标签：分类=0/1 方向，回归=连续收益。"""
         Xa = self._as_frame(X)
         ya = self._as_labels(y)
@@ -82,9 +80,11 @@ class LightGBMModel:
         if imp is None:
             return pd.DataFrame({"feature": names, "importance": [0.0] * len(names)})
         gain = imp.feature_importance(importance_type="gain")
-        return pd.DataFrame({"feature": names, "importance": gain}).sort_values(
-            "importance", ascending=False
-        ).reset_index(drop=True)
+        return (
+            pd.DataFrame({"feature": names, "importance": gain})
+            .sort_values("importance", ascending=False)
+            .reset_index(drop=True)
+        )
 
     # ------------------------------------------------------------------
     def _as_frame(self, X) -> pd.DataFrame:
@@ -107,16 +107,12 @@ class LightGBMModel:
             raise RuntimeError("模型未训练，先调用 fit()")
 
 
-def train_direction_classifier(
-    X, y, seed: int = 42, params: Optional[Dict] = None
-) -> LightGBMModel:
+def train_direction_classifier(X, y, seed: int = 42, params: dict | None = None) -> LightGBMModel:
     """训练方向分类器（薄封装，语义化入口）。"""
     return LightGBMModel(TASK_CLASSIFICATION, params=params, seed=seed).fit(X, y)
 
 
-def train_return_regressor(
-    X, y, seed: int = 42, params: Optional[Dict] = None
-) -> LightGBMModel:
+def train_return_regressor(X, y, seed: int = 42, params: dict | None = None) -> LightGBMModel:
     """训练收益回归器（薄封装，语义化入口）。"""
     return LightGBMModel(TASK_REGRESSION, params=params, seed=seed).fit(X, y)
 

@@ -20,7 +20,6 @@ from PyQt5.QtWidgets import (
 )
 
 from config import DEFAULT_TICKERS
-from core.exceptions import DataNotFoundError
 from data.manager import DataManager
 from ui.charts_qt import price_chart, returns_histogram
 from ui.worker import run_in_thread
@@ -136,7 +135,12 @@ class DataPage(QWidget):
         interval = self.interval_combo.currentText()
 
         self._thread = run_in_thread(
-            self, self.dm.get_data, tickers, str(sd), str(ed), interval,
+            self,
+            self.dm.get_data,
+            tickers,
+            str(sd),
+            str(ed),
+            interval,
             on_finished=self._on_data_loaded,
             on_error=self._on_data_error,
         )

@@ -1,6 +1,6 @@
 """Orchestrator: coordinates download + cache for multi-ticker data requests."""
 
-from typing import Callable, List, Optional
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -13,20 +13,20 @@ from data.downloader import DataDownloader
 class DataManager:
     def __init__(
         self,
-        downloader: Optional[DataDownloader] = None,
-        cache: Optional[DataCache] = None,
+        downloader: DataDownloader | None = None,
+        cache: DataCache | None = None,
     ):
         self.downloader = downloader or DataDownloader()
         self.cache = cache or DataCache()
 
     def get_data(
         self,
-        tickers: List[str],
+        tickers: list[str],
         start: str,
         end: str,
         interval: str = "1d",
         force_download: bool = False,
-        progress_callback: Optional[Callable[[str, str], None]] = None,
+        progress_callback: Callable[[str, str], None] | None = None,
     ) -> pd.DataFrame:
         frames = {}
         errors = []
@@ -55,9 +55,7 @@ class DataManager:
                 errors.append((ticker, str(e)))
 
         if not frames:
-            raise DataNotFoundError(
-                f"No data available for any ticker. Errors: {errors}"
-            )
+            raise DataNotFoundError(f"No data available for any ticker. Errors: {errors}")
 
         combined = pd.concat(frames, axis=1)
         combined.columns = pd.MultiIndex.from_tuples(combined.columns)
@@ -66,7 +64,7 @@ class DataManager:
     def get_single(self, ticker: str, start: str, end: str, interval: str = "1d") -> pd.DataFrame:
         return self.get_data([ticker], start, end, interval)
 
-    def list_cached_tickers(self) -> List[str]:
+    def list_cached_tickers(self) -> list[str]:
         return self.cache.get_stats()["tickers"]
 
     def get_data_overview(self, data: pd.DataFrame) -> dict:

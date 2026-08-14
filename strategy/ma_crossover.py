@@ -22,16 +22,29 @@ class MACrossoverStrategy(BaseStrategy):
     def get_param_spec(cls) -> dict:
         return {
             "fast_period": {
-                "type": "int", "default": 20, "min": 2, "max": 200, "step": 1,
-                "label": "快线周期", "help": "短期均线窗口",
+                "type": "int",
+                "default": 20,
+                "min": 2,
+                "max": 200,
+                "step": 1,
+                "label": "快线周期",
+                "help": "短期均线窗口",
             },
             "slow_period": {
-                "type": "int", "default": 50, "min": 5, "max": 500, "step": 1,
-                "label": "慢线周期", "help": "长期均线窗口",
+                "type": "int",
+                "default": 50,
+                "min": 5,
+                "max": 500,
+                "step": 1,
+                "label": "慢线周期",
+                "help": "长期均线窗口",
             },
             "ma_type": {
-                "type": "choice", "default": "sma", "choices": ["sma", "ema"],
-                "label": "均线类型", "help": "SMA 简单移动平均 / EMA 指数移动平均",
+                "type": "choice",
+                "default": "sma",
+                "choices": ["sma", "ema"],
+                "label": "均线类型",
+                "help": "SMA 简单移动平均 / EMA 指数移动平均",
             },
         }
 

@@ -1,7 +1,6 @@
 """Abstract base class for all trading strategies."""
 
 from abc import ABC, abstractmethod
-from typing import Dict
 
 import pandas as pd
 
@@ -29,7 +28,7 @@ class BaseStrategy(ABC):
 
     @classmethod
     @abstractmethod
-    def get_param_spec(cls) -> Dict[str, dict]:
+    def get_param_spec(cls) -> dict[str, dict]:
         """Parameter schema for auto-generating UI controls.
         Format: {param_name: {type, default, min, max, step, label, help, choices}}
         """
@@ -39,7 +38,7 @@ class BaseStrategy(ABC):
         for key, info in spec.items():
             value = self.params.get(key, info["default"])
             if info["type"] == "int":
-                if not isinstance(value, (int, float)):
+                if not isinstance(value, int | float):
                     raise StrategyError(f"{key} must be a number, got {type(value).__name__}")
                 if "min" in info and value < info["min"]:
                     raise StrategyError(f"{key} must be >= {info['min']}, got {value}")

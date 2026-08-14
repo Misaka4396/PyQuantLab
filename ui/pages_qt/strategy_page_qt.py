@@ -1,14 +1,13 @@
 """策略配置页面 — 选择与配置交易策略."""
 
 import pandas as pd
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QSlider,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -88,10 +87,11 @@ class StrategyPage(QWidget):
 
     def on_activated(self):
         from PyQt5.QtWidgets import QApplication
+
         for w in QApplication.instance().allWidgets():
-            if hasattr(w, 'nav_list'):
+            if hasattr(w, "nav_list"):
                 data_page = w.pages[1]
-                if hasattr(data_page, 'data') and data_page.data is not None:
+                if hasattr(data_page, "data") and data_page.data is not None:
                     self.data = data_page.data
                     self._update_preview()
                 break
@@ -183,7 +183,9 @@ class StrategyPage(QWidget):
                     ticker = self.data.columns.levels[0][0]
                     close = self.data[(ticker, "Close")]
                 else:
-                    close = self.data["Close"] if "Close" in self.data.columns else self.data.iloc[:, 0]
+                    close = (
+                        self.data["Close"] if "Close" in self.data.columns else self.data.iloc[:, 0]
+                    )
                 preview_len = min(300, len(self.data))
                 chart_data = pd.DataFrame(
                     {"Close": close.tail(preview_len)}, index=self.data.index[-preview_len:]
@@ -194,7 +196,8 @@ class StrategyPage(QWidget):
                 return chart_data, signals_df
 
             self._preview_thread = run_in_thread(
-                self, _compute,
+                self,
+                _compute,
                 on_finished=self._on_preview_computed,
             )
         except Exception:

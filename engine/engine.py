@@ -17,13 +17,15 @@
 - 重训调度：通过 register_callback 挂载 MarketDataEvent / PortfolioEvent 回调，
   在指定时点触发重训，不改动引擎循环。
 """
+
 from __future__ import annotations
 
+import itertools
 import logging
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -31,11 +33,9 @@ import pandas as pd
 from core.exceptions import EngineError
 from data import schemas as sc
 from engine.accounting import Accounting
-from engine.config import EngineConfig, FILL_NEXT_BAR, FILL_OPEN
+from engine.config import FILL_OPEN, EngineConfig
 from engine.events import (
-    BUY,
     Event,
-    FillEvent,
     MarketDataEvent,
     OrderEvent,
     PortfolioEvent,
@@ -62,9 +62,9 @@ class Strategy(ABC):
     def on_bar(
         self,
         timestamp: pd.Timestamp,
-        bars: Dict[str, MarketDataEvent],
+        bars: dict[str, MarketDataEvent],
         portfolio: Portfolio,
-    ) -> List[SignalEvent]:
+    ) -> list[SignalEvent]:
         """基于当前 bar 数据与组合状态生成信号（不直接下单，只返回意图）。"""
 
 
@@ -75,8 +75,8 @@ class EngineResult:
     equity_curve: pd.DataFrame = field(default_factory=pd.DataFrame)
     fills: pd.DataFrame = field(default_factory=pd.DataFrame)
     orders: pd.DataFrame = field(default_factory=pd.DataFrame)
-    portfolio: Optional[Portfolio] = None
-    config: Optional[EngineConfig] = None
+    portfolio: Portfolio | None = None
+    config: EngineConfig | None = None
 
 
 class EventEngine:
@@ -84,10 +84,10 @@ class EventEngine:
 
     def __init__(
         self,
-        config: Optional[EngineConfig] = None,
-        data: Optional[Union[Dict[str, pd.DataFrame], pd.DataFrame]] = None,
-        cost_model: Optional[CostModelLike] = None,
-        strategy: Optional[Strategy] = None,
+        config: EngineConfig | None = None,
+        data: dict[str, pd.DataFrame] | pd.DataFrame | None = None,
+        cost_model: CostModelLike | None = None,
+        strategy: Strategy | None = None,
     ):
         self.config = config or EngineConfig()
         self.config.validate()
@@ -98,17 +98,17 @@ class EventEngine:
         self.strategy = strategy
 
         self.rng = np.random.default_rng(self.config.seed)
-        self._callbacks: Dict[str, List[Callable]] = defaultdict(list)
+        self._callbacks: dict[str, list[Callable]] = defaultdict(list)
         self._order_seq = 0
         self.logger = self._setup_logger()
 
         # 预计算 master 时间轴与各标的 next-bar 映射
         self._master_index: pd.DatetimeIndex = self._build_master_index()
-        self._tsets: Dict[str, set] = {sym: set(df.index) for sym, df in self.data.items()}
-        self._next_map: Dict[str, Dict[pd.Timestamp, pd.Timestamp]] = {}
+        self._tsets: dict[str, set] = {sym: set(df.index) for sym, df in self.data.items()}
+        self._next_map: dict[str, dict[pd.Timestamp, pd.Timestamp]] = {}
         for sym, df in self.data.items():
             idx = df.index
-            self._next_map[sym] = dict(zip(idx[:-1], idx[1:]))
+            self._next_map[sym] = dict(itertools.pairwise(idx))
 
     # ------------------------------------------------------------------
     # 插件/回调注册
@@ -136,14 +136,14 @@ class EventEngine:
 
         portfolio = Portfolio(self.config.initial_cash)
         accounting = Accounting()
-        pending: List[Order] = []
-        orders_log: List[Order] = []
+        pending: list[Order] = []
+        orders_log: list[Order] = []
         self._order_seq = 0
-        last_prices: Dict[str, float] = {}
+        last_prices: dict[str, float] = {}
 
         for t in self._master_index:
             # 1) 构造当前 bar 的行情事件
-            bars_t: Dict[str, MarketDataEvent] = {}
+            bars_t: dict[str, MarketDataEvent] = {}
             for sym, df in self.data.items():
                 if t in self._tsets[sym]:
                     row = df.loc[t]
@@ -154,7 +154,7 @@ class EventEngine:
             self._emit_market_events(bars_t)
 
             # 2) 撮合到期订单（next_bar 单在下一 bar 开盘成交）
-            remaining: List[Order] = []
+            remaining: list[Order] = []
             for order in pending:
                 if order.fill_timestamp == t:
                     self._execute(order, bars_t, portfolio, accounting)
@@ -168,17 +168,19 @@ class EventEngine:
                 for sig in signals:
                     order = self._create_order(sig, t)
                     orders_log.append(order)
-                    self._emit(OrderEvent(
-                        timestamp=order.timestamp,
-                        order_id=order.order_id,
-                        symbol=order.symbol,
-                        side=order.side.value,
-                        quantity=order.quantity,
-                        order_type=order.order_type.value,
-                        limit_price=order.limit_price,
-                        status=order.status.value,
-                        fill_timestamp=order.fill_timestamp,
-                    ))
+                    self._emit(
+                        OrderEvent(
+                            timestamp=order.timestamp,
+                            order_id=order.order_id,
+                            symbol=order.symbol,
+                            side=order.side.value,
+                            quantity=order.quantity,
+                            order_type=order.order_type.value,
+                            limit_price=order.limit_price,
+                            status=order.status.value,
+                            fill_timestamp=order.fill_timestamp,
+                        )
+                    )
                     if self.config.fill_mode == FILL_OPEN:
                         # 当 bar 开盘价撮合（注意：可能与信号使用当 bar 收盘价产生前视）
                         self._execute(order, bars_t, portfolio, accounting)
@@ -195,15 +197,17 @@ class EventEngine:
             # 4) 期末盯市（用各标的最近已知收盘价）
             prices = dict(last_prices)
             rec = accounting.mark_to_market(t, portfolio, prices)
-            self._emit(PortfolioEvent(
-                timestamp=t,
-                cash=rec["cash"],
-                positions=rec["positions"],
-                market_value=rec["market_value"],
-                equity=rec["equity"],
-                available_cash=rec["available_cash"],
-                total_fees=rec["total_fees"],
-            ))
+            self._emit(
+                PortfolioEvent(
+                    timestamp=t,
+                    cash=rec["cash"],
+                    positions=rec["positions"],
+                    market_value=rec["market_value"],
+                    equity=rec["equity"],
+                    available_cash=rec["available_cash"],
+                    total_fees=rec["total_fees"],
+                )
+            )
 
         return EngineResult(
             equity_curve=accounting.equity_curve(),
@@ -219,7 +223,7 @@ class EventEngine:
     def _execute(
         self,
         order: Order,
-        bars_t: Dict[str, MarketDataEvent],
+        bars_t: dict[str, MarketDataEvent],
         portfolio: Portfolio,
         accounting: Accounting,
     ) -> None:
@@ -277,7 +281,7 @@ class EventEngine:
     # ------------------------------------------------------------------
     # 内部：数据与时间轴
     # ------------------------------------------------------------------
-    def _normalize_data(self, data) -> Dict[str, pd.DataFrame]:
+    def _normalize_data(self, data) -> dict[str, pd.DataFrame]:
         """把输入数据归一化为 {symbol: DataFrame}（宽表 dict 或含 symbol 列的长表）。"""
         if isinstance(data, dict):
             return {sym: self._prepare_symbol_df(sym, df) for sym, df in data.items()}
@@ -328,7 +332,7 @@ class EventEngine:
             amount=float(row.get(sc.COL_AMOUNT, 0.0)),
         )
 
-    def _emit_market_events(self, bars_t: Dict[str, MarketDataEvent]) -> None:
+    def _emit_market_events(self, bars_t: dict[str, MarketDataEvent]) -> None:
         for bar in bars_t.values():
             self._emit(bar)
 

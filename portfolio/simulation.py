@@ -1,7 +1,5 @@
 """Monte Carlo portfolio simulation using Cholesky decomposition."""
 
-from typing import Dict, Optional
-
 import numpy as np
 import pandas as pd
 
@@ -26,7 +24,7 @@ class PortfolioSimulation:
         weights: np.ndarray,
         initial_value: float = 100_000.0,
         days: int = TRADING_DAYS,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> np.ndarray:
         if seed is not None:
             np.random.seed(seed)
@@ -41,7 +39,7 @@ class PortfolioSimulation:
             paths[:, t] = paths[:, t - 1] * (1 + port_r)
         return paths
 
-    def compute_terminal_stats(self, simulation: np.ndarray) -> Dict:
+    def compute_terminal_stats(self, simulation: np.ndarray) -> dict:
         terminal = simulation[:, -1]
         return {
             "mean": float(np.mean(terminal)),
@@ -61,6 +59,12 @@ class PortfolioSimulation:
         p50 = np.percentile(simulation, 50, axis=0)
         p75 = np.percentile(simulation, 75, axis=0)
         p95 = np.percentile(simulation, 95, axis=0)
-        return pd.DataFrame({
-            "p5": p5, "p25": p25, "p50": p50, "p75": p75, "p95": p95,
-        })
+        return pd.DataFrame(
+            {
+                "p5": p5,
+                "p25": p25,
+                "p50": p50,
+                "p75": p75,
+                "p95": p95,
+            }
+        )

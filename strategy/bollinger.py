@@ -22,12 +22,22 @@ class BollingerStrategy(BaseStrategy):
     def get_param_spec(cls) -> dict:
         return {
             "period": {
-                "type": "int", "default": 20, "min": 5, "max": 100, "step": 1,
-                "label": "布林带周期", "help": "移动平均窗口",
+                "type": "int",
+                "default": 20,
+                "min": 5,
+                "max": 100,
+                "step": 1,
+                "label": "布林带周期",
+                "help": "移动平均窗口",
             },
             "num_std": {
-                "type": "int", "default": 2, "min": 1, "max": 4, "step": 1,
-                "label": "标准差倍数", "help": "带宽乘数",
+                "type": "int",
+                "default": 2,
+                "min": 1,
+                "max": 4,
+                "step": 1,
+                "label": "标准差倍数",
+                "help": "带宽乘数",
             },
         }
 

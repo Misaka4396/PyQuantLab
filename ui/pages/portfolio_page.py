@@ -1,11 +1,9 @@
 """Page 5: Portfolio Simulation — optimization and Monte Carlo simulation."""
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 
 from config import MC_SIMULATIONS_DEFAULT
-from portfolio.manager import PortfolioManager
 from portfolio.optimizer import PortfolioOptimizer
 from portfolio.simulation import PortfolioSimulation
 from ui.components.charts import (
@@ -18,9 +16,7 @@ from ui.session_state import KEYS
 
 def render() -> None:
     st.title("Portfolio Simulator")
-    st.markdown(
-        "Portfolio optimization (mean-variance / risk parity) and Monte Carlo simulation."
-    )
+    st.markdown("Portfolio optimization (mean-variance / risk parity) and Monte Carlo simulation.")
 
     data = st.session_state.get(KEYS["data_df"])
     if data is None:
@@ -70,10 +66,12 @@ def render() -> None:
         pw = st.session_state.get(KEYS["portfolio_weights"])
         if pw is not None:
             st.markdown("### Optimal Weights")
-            w_df = pd.DataFrame({
-                "Asset": pw.assets,
-                "Weight": pw.weights,
-            })
+            w_df = pd.DataFrame(
+                {
+                    "Asset": pw.assets,
+                    "Weight": pw.weights,
+                }
+            )
             w_df["Weight %"] = w_df["Weight"].apply(lambda x: f"{x * 100:.1f}%")
             st.dataframe(w_df.set_index("Asset"), use_container_width=True)
 
@@ -132,12 +130,12 @@ def render() -> None:
         cols[2].metric("Std", f"${stats.get('std', 0):,.0f}")
         cols[3].metric("P5", f"${stats.get('p5', 0):,.0f}")
         cols[4].metric("P95", f"${stats.get('p95', 0):,.0f}")
-        cols[5].metric("Min/Max", f"${stats.get('min',0):,.0f} / ${stats.get('max',0):,.0f}")
+        cols[5].metric("Min/Max", f"${stats.get('min', 0):,.0f} / ${stats.get('max', 0):,.0f}")
 
     # Correlation
     st.divider()
     st.subheader("Asset Correlations")
     if len(tickers) >= 2:
-        corr = returns.corr() if len(tickers) <= 10 else returns.corr()
+        corr = returns.corr()
         fig_corr = correlation_heatmap_chart(corr)
         st.plotly_chart(fig_corr, use_container_width=True)

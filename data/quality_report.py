@@ -6,13 +6,12 @@
 - suspension_rate：停牌（成交量=0）占比
 - limit_up/down  ：涨跌停 bar 计数
 """
+
 from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
-import numpy as np
 import pandas as pd
 
 from data import schemas as sc
@@ -25,14 +24,14 @@ ALL_COLS = PRICE_COLS + sc.OHLCV_OPTIONAL
 class QualityReporter:
     """数据质量检查器，基于 DataLoader 读取的原始数据生成质量报告。"""
 
-    def __init__(self, data_root: Union[str, Path] = DEFAULT_DATA_ROOT, limit_pct: float = 0.10):
+    def __init__(self, data_root: str | Path = DEFAULT_DATA_ROOT, limit_pct: float = 0.10):
         self.loader = DataLoader(data_root)
         self.limit_pct = limit_pct
 
     # ------------------------------------------------------------------
     # 统计
     # ------------------------------------------------------------------
-    def inspect_ohlcv(self, df: pd.DataFrame) -> Dict:
+    def inspect_ohlcv(self, df: pd.DataFrame) -> dict:
         """对单个 OHLCV 原始表计算质量指标，返回 dict。"""
         df = df.copy()
         if sc.COL_DATETIME in df.columns:
@@ -91,14 +90,14 @@ class QualityReporter:
             "limit_down": limit_down,
         }
 
-    def inspect_symbol(self, symbol: str) -> Dict:
+    def inspect_symbol(self, symbol: str) -> dict:
         """读取某证券原始数据并计算质量指标。"""
         raw = self.loader.load_ohlcv(symbol, clean=False)
         stats = self.inspect_ohlcv(raw)
         stats["symbol"] = symbol
         return stats
 
-    def build_report(self, symbols: Optional[List[str]] = None) -> Dict[str, Dict]:
+    def build_report(self, symbols: list[str] | None = None) -> dict[str, dict]:
         """批量生成质量报告；symbols 为空时扫描全部已落盘证券。"""
         if symbols is None:
             symbols = self.loader.list_ohlcv_symbols()
@@ -107,7 +106,7 @@ class QualityReporter:
     # ------------------------------------------------------------------
     # 输出
     # ------------------------------------------------------------------
-    def to_markdown(self, report: Dict[str, Dict]) -> str:
+    def to_markdown(self, report: dict[str, dict]) -> str:
         """把质量报告 dict 渲染为 markdown 文本。"""
         lines = [
             "# 数据质量报告",
@@ -140,8 +139,8 @@ class QualityReporter:
 
     def write_report(
         self,
-        path: Optional[Union[str, Path]] = None,
-        symbols: Optional[List[str]] = None,
+        path: str | Path | None = None,
+        symbols: list[str] | None = None,
     ) -> str:
         """生成并写出 markdown 报告，返回报告文件路径。"""
         report = self.build_report(symbols)

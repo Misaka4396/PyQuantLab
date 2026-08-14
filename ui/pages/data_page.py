@@ -84,10 +84,7 @@ def render() -> None:
         st.dataframe(display_data.tail(500), use_container_width=True, height=400)
 
     with tab2:
-        if isinstance(data.columns, pd.MultiIndex):
-            ticker = data.columns.levels[0][0]
-        else:
-            ticker = "Stock"
+        ticker = data.columns.levels[0][0] if isinstance(data.columns, pd.MultiIndex) else "Stock"
         fig = price_chart(data, ticker)
         st.plotly_chart(fig, use_container_width=True)
 

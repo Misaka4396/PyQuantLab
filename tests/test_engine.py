@@ -7,6 +7,7 @@
 - 可复现（同种子两次运行结果一致）
 - 回调机制可挂载自定义策略与成本模型（解耦验证）
 """
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -20,7 +21,6 @@ from engine import (
     EngineConfig,
     EventEngine,
     FillEvent,
-    MarketDataEvent,
     PortfolioEvent,
     SignalEvent,
     Strategy,
@@ -36,12 +36,19 @@ def make_df(index, opens, closes, volumes=None) -> pd.DataFrame:
     idx = pd.to_datetime(index)
     opens = list(opens)
     closes = list(closes)
-    high = [max(o, c) for o, c in zip(opens, closes)]
-    low = [min(o, c) for o, c in zip(opens, closes)]
+    high = [max(o, c) for o, c in zip(opens, closes, strict=False)]
+    low = [min(o, c) for o, c in zip(opens, closes, strict=False)]
     vol = list(volumes) if volumes else [1000.0] * len(idx)
-    df = pd.DataFrame({
-        "open": opens, "high": high, "low": low, "close": closes, "volume": vol,
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            "open": opens,
+            "high": high,
+            "low": low,
+            "close": closes,
+            "volume": vol,
+        },
+        index=idx,
+    )
     df.index.name = "datetime"
     return df
 
@@ -73,10 +80,16 @@ class BuyAndHold(Strategy):
         if self.symbol not in bars:
             return []
         self._bought = True
-        return [SignalEvent(
-            timestamp=timestamp, symbol=self.symbol, side="BUY",
-            quantity=self.quantity, order_type="market", reason="首次建仓",
-        )]
+        return [
+            SignalEvent(
+                timestamp=timestamp,
+                symbol=self.symbol,
+                side="BUY",
+                quantity=self.quantity,
+                order_type="market",
+                reason="首次建仓",
+            )
+        ]
 
 
 class MultiBuy(Strategy):
@@ -93,8 +106,14 @@ class MultiBuy(Strategy):
             return []
         self._done = True
         return [
-            SignalEvent(timestamp=timestamp, symbol=s, side="BUY",
-                        quantity=q, order_type="market", reason="篮子买入")
+            SignalEvent(
+                timestamp=timestamp,
+                symbol=s,
+                side="BUY",
+                quantity=q,
+                order_type="market",
+                reason="篮子买入",
+            )
             for s, q in self.orders.items()
         ]
 
@@ -112,10 +131,17 @@ class LimitBuy(Strategy):
         if self._done or self.symbol not in bars:
             return []
         self._done = True
-        return [SignalEvent(
-            timestamp=timestamp, symbol=self.symbol, side="BUY", quantity=self.quantity,
-            order_type="limit", limit_price=self.limit_price, reason="限价买入",
-        )]
+        return [
+            SignalEvent(
+                timestamp=timestamp,
+                symbol=self.symbol,
+                side="BUY",
+                quantity=self.quantity,
+                order_type="limit",
+                limit_price=self.limit_price,
+                reason="限价买入",
+            )
+        ]
 
 
 class DummyCostModel:
@@ -123,8 +149,11 @@ class DummyCostModel:
 
     def compute(self, side, quantity, price, symbol="", is_etf=False, volume=0.0):
         return SimpleNamespace(
-            exec_price=price, commission=1.0, stamp_tax=0.0,
-            transfer_fee=0.0, total_fee=1.0,
+            exec_price=price,
+            commission=1.0,
+            stamp_tax=0.0,
+            transfer_fee=0.0,
+            total_fee=1.0,
         )
 
 
@@ -167,7 +196,7 @@ def test_next_bar_no_lookahead_fill_at_next_open():
     data = {
         "510300": make_df(
             ["2024-01-02", "2024-01-03"],
-            opens=[10.0, 99.0],   # 下一 bar 开盘价与当 bar 开盘价差异极大
+            opens=[10.0, 99.0],  # 下一 bar 开盘价与当 bar 开盘价差异极大
             closes=[10.0, 99.0],
         ),
     }
@@ -281,10 +310,13 @@ def test_reproducible_same_seed():
 # 回调 / 插件机制
 # ---------------------------------------------------------------------------
 def test_callback_mechanism():
-    data = {"510300": make_df(
-        ["2024-01-02", "2024-01-03"],
-        opens=[10.0, 10.5], closes=[10.0, 11.0],
-    )}
+    data = {
+        "510300": make_df(
+            ["2024-01-02", "2024-01-03"],
+            opens=[10.0, 10.5],
+            closes=[10.0, 11.0],
+        )
+    }
     engine = EventEngine(
         config=EngineConfig(initial_cash=1_000_000.0, fill_mode="next_bar"),
         data=data,
@@ -306,10 +338,13 @@ def test_callback_mechanism():
 
 def test_cost_model_decoupled_via_interface():
     """注入自定义成本模型（非 CostModel），engine 应原样使用其输出（不硬编码）。"""
-    data = {"510300": make_df(
-        ["2024-01-02", "2024-01-03"],
-        opens=[10.0, 10.5], closes=[10.0, 11.0],
-    )}
+    data = {
+        "510300": make_df(
+            ["2024-01-02", "2024-01-03"],
+            opens=[10.0, 10.5],
+            closes=[10.0, 11.0],
+        )
+    }
     engine = EventEngine(
         config=EngineConfig(initial_cash=1_000_000.0, fill_mode="next_bar"),
         data=data,
@@ -326,10 +361,13 @@ def test_cost_model_decoupled_via_interface():
 # 限价单 / 资金不足
 # ---------------------------------------------------------------------------
 def test_limit_buy_above_open_fills_at_open():
-    data = {"510300": make_df(
-        ["2024-01-02", "2024-01-03"],
-        opens=[10.0, 10.5], closes=[10.0, 11.0],
-    )}
+    data = {
+        "510300": make_df(
+            ["2024-01-02", "2024-01-03"],
+            opens=[10.0, 10.5],
+            closes=[10.0, 11.0],
+        )
+    }
     engine = EventEngine(
         config=EngineConfig(initial_cash=1_000_000.0, fill_mode="next_bar"),
         data=data,
@@ -343,10 +381,13 @@ def test_limit_buy_above_open_fills_at_open():
 
 
 def test_limit_buy_below_open_not_filled():
-    data = {"510300": make_df(
-        ["2024-01-02", "2024-01-03"],
-        opens=[10.0, 10.5], closes=[10.0, 11.0],
-    )}
+    data = {
+        "510300": make_df(
+            ["2024-01-02", "2024-01-03"],
+            opens=[10.0, 10.5],
+            closes=[10.0, 11.0],
+        )
+    }
     engine = EventEngine(
         config=EngineConfig(initial_cash=1_000_000.0, fill_mode="next_bar"),
         data=data,
@@ -360,10 +401,13 @@ def test_limit_buy_below_open_not_filled():
 
 
 def test_insufficient_funds_rejected():
-    data = {"510300": make_df(
-        ["2024-01-02", "2024-01-03"],
-        opens=[10.0, 10.5], closes=[10.0, 11.0],
-    )}
+    data = {
+        "510300": make_df(
+            ["2024-01-02", "2024-01-03"],
+            opens=[10.0, 10.5],
+            closes=[10.0, 11.0],
+        )
+    }
     # 初始资金不足以买 100 股（含手续费）
     engine = EventEngine(
         config=EngineConfig(initial_cash=100.0, fill_mode="next_bar"),
@@ -383,15 +427,17 @@ def test_insufficient_funds_rejected():
 # ---------------------------------------------------------------------------
 def test_long_format_data_input():
     idx = pd.to_datetime(["2024-01-02", "2024-01-03"])
-    long_df = pd.DataFrame({
-        "open": [10.0, 10.5, 5.0, 5.5],
-        "high": [10.0, 11.0, 5.0, 5.5],
-        "low": [10.0, 10.5, 5.0, 5.5],
-        "close": [10.0, 11.0, 5.0, 5.5],
-        "volume": [1000.0] * 4,
-        "symbol": ["510300", "510300", "510500", "510500"],
-        "datetime": [idx[0], idx[1], idx[0], idx[1]],
-    })
+    long_df = pd.DataFrame(
+        {
+            "open": [10.0, 10.5, 5.0, 5.5],
+            "high": [10.0, 11.0, 5.0, 5.5],
+            "low": [10.0, 10.5, 5.0, 5.5],
+            "close": [10.0, 11.0, 5.0, 5.5],
+            "volume": [1000.0] * 4,
+            "symbol": ["510300", "510300", "510500", "510500"],
+            "datetime": [idx[0], idx[1], idx[0], idx[1]],
+        }
+    )
     engine = EventEngine(
         config=EngineConfig(initial_cash=1_000_000.0, fill_mode="next_bar"),
         data=long_df,

@@ -2,11 +2,11 @@
 
 订单本身只描述意图与状态，不包含撮合与成本逻辑（撮合在 matching.py）。
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Optional
 
 import pandas as pd
 
@@ -50,10 +50,10 @@ class Order:
     side: OrderSide
     quantity: float
     order_type: OrderType = OrderType.MARKET
-    limit_price: Optional[float] = None
-    timestamp: Optional[pd.Timestamp] = None        # 下单时点（信号所在 bar）
+    limit_price: float | None = None
+    timestamp: pd.Timestamp | None = None  # 下单时点（信号所在 bar）
     status: OrderStatus = OrderStatus.CREATED
-    fill_timestamp: Optional[pd.Timestamp] = None   # 计划撮合时点（next_bar 模式）
+    fill_timestamp: pd.Timestamp | None = None  # 计划撮合时点（next_bar 模式）
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -68,7 +68,7 @@ def create_market_order(
     symbol: str,
     side,
     quantity: float,
-    timestamp: Optional[pd.Timestamp] = None,
+    timestamp: pd.Timestamp | None = None,
 ) -> Order:
     """创建市价单。"""
     return Order(
@@ -87,7 +87,7 @@ def create_limit_order(
     side,
     quantity: float,
     limit_price: float,
-    timestamp: Optional[pd.Timestamp] = None,
+    timestamp: pd.Timestamp | None = None,
 ) -> Order:
     """创建限价单。"""
     return Order(

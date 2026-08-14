@@ -6,6 +6,7 @@
 - IS/OOS 对比接口（C4 联动）
 - 一键生成报告（PNG / HTML / trade CSV 均落盘）
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -68,7 +69,7 @@ def test_cumulative_and_annualized_return():
     """累计 = (121/100 - 1)；年化 = (1.21)^(periods/n) - 1，n=1、periods=4。"""
     analyzer = analyzer_from_equity([100, 121], periods_per_year=4)
     assert analyzer.cumulative_return() == pytest.approx(0.21, rel=1e-12)
-    expected_ann = 1.21 ** 4 - 1.0
+    expected_ann = 1.21**4 - 1.0
     assert analyzer.annualized_return() == pytest.approx(expected_ann, rel=1e-12)
 
 
@@ -98,12 +99,26 @@ def test_monthly_and_yearly_returns():
 # ---------------------------------------------------------------------------
 def test_round_trips_fifo_pnl():
     """一笔买入 100@10、卖出 100@11，无费用：pnl=100、win。"""
-    fills = make_fills([
-        {"timestamp": "2024-01-02", "symbol": "510300", "side": "BUY",
-         "quantity": 100.0, "exec_price": 10.0, "total_fee": 0.0},
-        {"timestamp": "2024-01-03", "symbol": "510300", "side": "SELL",
-         "quantity": 100.0, "exec_price": 11.0, "total_fee": 0.0},
-    ])
+    fills = make_fills(
+        [
+            {
+                "timestamp": "2024-01-02",
+                "symbol": "510300",
+                "side": "BUY",
+                "quantity": 100.0,
+                "exec_price": 10.0,
+                "total_fee": 0.0,
+            },
+            {
+                "timestamp": "2024-01-03",
+                "symbol": "510300",
+                "side": "SELL",
+                "quantity": 100.0,
+                "exec_price": 11.0,
+                "total_fee": 0.0,
+            },
+        ]
+    )
     trips = build_round_trips(fills)
     assert len(trips) == 1
     t = trips[0]
@@ -114,14 +129,45 @@ def test_round_trips_fifo_pnl():
 
 def test_trade_statistics_win_rate_and_profit_factor():
     """两笔交易一赢一亏：胜率 0.5，盈亏比 = 盈利/|亏损|。"""
-    fills = make_fills([
-        {"timestamp": "2024-01-02", "symbol": "A", "side": "BUY", "quantity": 100.0, "exec_price": 10.0, "total_fee": 0.0},
-        {"timestamp": "2024-01-03", "symbol": "A", "side": "SELL", "quantity": 100.0, "exec_price": 11.0, "total_fee": 0.0},
-        {"timestamp": "2024-01-02", "symbol": "B", "side": "BUY", "quantity": 100.0, "exec_price": 10.0, "total_fee": 0.0},
-        {"timestamp": "2024-01-03", "symbol": "B", "side": "SELL", "quantity": 100.0, "exec_price": 9.0, "total_fee": 0.0},
-    ])
+    fills = make_fills(
+        [
+            {
+                "timestamp": "2024-01-02",
+                "symbol": "A",
+                "side": "BUY",
+                "quantity": 100.0,
+                "exec_price": 10.0,
+                "total_fee": 0.0,
+            },
+            {
+                "timestamp": "2024-01-03",
+                "symbol": "A",
+                "side": "SELL",
+                "quantity": 100.0,
+                "exec_price": 11.0,
+                "total_fee": 0.0,
+            },
+            {
+                "timestamp": "2024-01-02",
+                "symbol": "B",
+                "side": "BUY",
+                "quantity": 100.0,
+                "exec_price": 10.0,
+                "total_fee": 0.0,
+            },
+            {
+                "timestamp": "2024-01-03",
+                "symbol": "B",
+                "side": "SELL",
+                "quantity": 100.0,
+                "exec_price": 9.0,
+                "total_fee": 0.0,
+            },
+        ]
+    )
     analyzer = PerformanceAnalyzer(
-        analyzer_from_equity([100, 105, 110]).equity_curve, fills=fills,
+        analyzer_from_equity([100, 105, 110]).equity_curve,
+        fills=fills,
     )
     stats = analyzer.trade_statistics()
     assert stats["total_trades"] == 2
@@ -131,12 +177,29 @@ def test_trade_statistics_win_rate_and_profit_factor():
 
 def test_trade_statistics_cost_ratio_and_turnover():
     """成本占比 = 费用/成交额；换手 = 成交额/平均权益。"""
-    fills = make_fills([
-        {"timestamp": "2024-01-02", "symbol": "A", "side": "BUY", "quantity": 100.0, "exec_price": 10.0, "total_fee": 10.0},
-        {"timestamp": "2024-01-03", "symbol": "A", "side": "SELL", "quantity": 100.0, "exec_price": 10.0, "total_fee": 10.0},
-    ])
+    fills = make_fills(
+        [
+            {
+                "timestamp": "2024-01-02",
+                "symbol": "A",
+                "side": "BUY",
+                "quantity": 100.0,
+                "exec_price": 10.0,
+                "total_fee": 10.0,
+            },
+            {
+                "timestamp": "2024-01-03",
+                "symbol": "A",
+                "side": "SELL",
+                "quantity": 100.0,
+                "exec_price": 10.0,
+                "total_fee": 10.0,
+            },
+        ]
+    )
     analyzer = PerformanceAnalyzer(
-        analyzer_from_equity([100, 105, 110]).equity_curve, fills=fills,
+        analyzer_from_equity([100, 105, 110]).equity_curve,
+        fills=fills,
     )
     stats = analyzer.trade_statistics()
     # 成交额 = 1000 + 1000 = 2000；费用 = 20 → 成本占比 1%
@@ -151,14 +214,45 @@ def test_trade_statistics_cost_ratio_and_turnover():
 # 归因
 # ---------------------------------------------------------------------------
 def test_attribute_by_symbol():
-    fills = make_fills([
-        {"timestamp": "2024-01-02", "symbol": "A", "side": "BUY", "quantity": 100.0, "exec_price": 10.0, "total_fee": 0.0},
-        {"timestamp": "2024-01-03", "symbol": "A", "side": "SELL", "quantity": 100.0, "exec_price": 12.0, "total_fee": 0.0},
-        {"timestamp": "2024-01-02", "symbol": "B", "side": "BUY", "quantity": 100.0, "exec_price": 10.0, "total_fee": 0.0},
-        {"timestamp": "2024-01-03", "symbol": "B", "side": "SELL", "quantity": 100.0, "exec_price": 8.0, "total_fee": 0.0},
-    ])
+    fills = make_fills(
+        [
+            {
+                "timestamp": "2024-01-02",
+                "symbol": "A",
+                "side": "BUY",
+                "quantity": 100.0,
+                "exec_price": 10.0,
+                "total_fee": 0.0,
+            },
+            {
+                "timestamp": "2024-01-03",
+                "symbol": "A",
+                "side": "SELL",
+                "quantity": 100.0,
+                "exec_price": 12.0,
+                "total_fee": 0.0,
+            },
+            {
+                "timestamp": "2024-01-02",
+                "symbol": "B",
+                "side": "BUY",
+                "quantity": 100.0,
+                "exec_price": 10.0,
+                "total_fee": 0.0,
+            },
+            {
+                "timestamp": "2024-01-03",
+                "symbol": "B",
+                "side": "SELL",
+                "quantity": 100.0,
+                "exec_price": 8.0,
+                "total_fee": 0.0,
+            },
+        ]
+    )
     analyzer = PerformanceAnalyzer(
-        analyzer_from_equity([100, 105, 110]).equity_curve, fills=fills,
+        analyzer_from_equity([100, 105, 110]).equity_curve,
+        fills=fills,
     )
     attr = analyzer.attribute_by_symbol()
     assert set(attr["symbol"]) == {"A", "B"}
@@ -182,15 +276,32 @@ def test_compare_is_oos_same_series():
 # 一键生成报告（PNG / HTML / trade CSV）
 # ---------------------------------------------------------------------------
 def test_report_generator_outputs_files(tmp_path):
-    fills = make_fills([
-        {"timestamp": "2024-01-02", "symbol": "A", "side": "BUY", "quantity": 100.0, "exec_price": 10.0, "total_fee": 5.0},
-        {"timestamp": "2024-01-03", "symbol": "A", "side": "SELL", "quantity": 100.0, "exec_price": 11.0, "total_fee": 5.0},
-    ])
+    fills = make_fills(
+        [
+            {
+                "timestamp": "2024-01-02",
+                "symbol": "A",
+                "side": "BUY",
+                "quantity": 100.0,
+                "exec_price": 10.0,
+                "total_fee": 5.0,
+            },
+            {
+                "timestamp": "2024-01-03",
+                "symbol": "A",
+                "side": "SELL",
+                "quantity": 100.0,
+                "exec_price": 11.0,
+                "total_fee": 5.0,
+            },
+        ]
+    )
     analyzer = PerformanceAnalyzer(
-        analyzer_from_equity([100, 105, 110]).equity_curve, fills=fills,
+        analyzer_from_equity([100, 105, 110]).equity_curve,
+        fills=fills,
     )
     gen = ReportGenerator(analyzer, title="测试")
-    paths = gen.generate(tmp_path, name="demo")
+    gen.generate(tmp_path, name="demo")
     assert (tmp_path / "demo.png").exists()
     assert (tmp_path / "demo.html").exists()
     assert (tmp_path / "demo_trades.csv").exists()

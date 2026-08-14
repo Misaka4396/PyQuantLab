@@ -6,9 +6,8 @@
 - CPU 训练，模型规模适中（hidden_size 默认 32，层数 1），单测 < 60s。
 - 固定种子（torch/numpy），保证可复现。
 """
-from __future__ import annotations
 
-from typing import Dict, Optional
+from __future__ import annotations
 
 import numpy as np
 import torch
@@ -38,13 +37,16 @@ class LSTMModel(nn.Module):
     ):
         super().__init__()
         self.lstm = nn.LSTM(
-            input_size, hidden_size, num_layers, batch_first=True,
+            input_size,
+            hidden_size,
+            num_layers,
+            batch_first=True,
             dropout=dropout if num_layers > 1 else 0.0,
         )
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out, _ = self.lstm(x)          # out: (B, seq_len, hidden)
+        out, _ = self.lstm(x)  # out: (B, seq_len, hidden)
         return self.fc(out[:, -1, :])  # 取最后一步
 
 
@@ -89,8 +91,12 @@ def build_model(
         return LSTMModel(input_size, hidden_size, num_layers, dropout, output_size)
     if model_name == DL_TRANSFORMER:
         return TransformerModel(
-            input_size, d_model=hidden_size, nhead=4,
-            num_layers=num_layers, dropout=dropout, output_size=output_size,
+            input_size,
+            d_model=hidden_size,
+            nhead=4,
+            num_layers=num_layers,
+            dropout=dropout,
+            output_size=output_size,
         )
     raise ValueError(f"未知模型类型: {model_name!r}")
 
@@ -117,7 +123,7 @@ def train_torch_model(
     batch_size: int = 32,
     learning_rate: float = 1e-3,
     seed: int = 42,
-) -> Dict[str, list]:
+) -> dict[str, list]:
     """训练循环（MSE 损失，回归口径；分类可改用 BCEWithLogits）。
 
     训练集 ``shuffle=False``：时序数据禁止跨时间 shuffle。
@@ -180,7 +186,7 @@ def train_torch_from_arrays(
     learning_rate: float = 1e-3,
     train_frac: float = 0.8,
     seed: int = 42,
-) -> Dict:
+) -> dict:
     """端到端：时序切分 → 构建 Dataset → 训练，返回模型 + 历史。"""
     Xtr, ytr, Xva, yva = train_val_split_by_time(X, y, train_frac)
     train_ds = TimeSeriesDataset(Xtr, ytr, seq_len)
@@ -189,8 +195,13 @@ def train_torch_from_arrays(
     input_size = int(np.asarray(Xtr).shape[1])
     model = build_model(model_name, input_size, hidden_size, num_layers, dropout)
     history = train_torch_model(
-        model, train_ds, val_ds, epochs=epochs, batch_size=batch_size,
-        learning_rate=learning_rate, seed=seed,
+        model,
+        train_ds,
+        val_ds,
+        epochs=epochs,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        seed=seed,
     )
     return {"model": model, "history": history, "train_dataset": train_ds, "val_dataset": val_ds}
 
@@ -199,8 +210,8 @@ __all__ = [
     "LSTMModel",
     "TransformerModel",
     "build_model",
-    "train_torch_model",
     "predict_torch_model",
-    "train_torch_from_arrays",
     "set_seed",
+    "train_torch_from_arrays",
+    "train_torch_model",
 ]

@@ -6,14 +6,14 @@
 
 本模块只定义参数，不包含任何计算逻辑（计算在 cost_model.py）。
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass
 
 # 冲击成本模型可选类型
-IMPACT_SQRT = "sqrt"       # 平方根冲击：impact = coef * sqrt(参与率)
-IMPACT_LINEAR = "linear"   # 线性冲击：impact = coef * 参与率
+IMPACT_SQRT = "sqrt"  # 平方根冲击：impact = coef * sqrt(参与率)
+IMPACT_LINEAR = "linear"  # 线性冲击：impact = coef * 参与率
 IMPACT_MODELS = (IMPACT_SQRT, IMPACT_LINEAR)
 
 
@@ -24,31 +24,31 @@ class CostConfig:
     # ------------------------------------------------------------------
     # 固定成本
     # ------------------------------------------------------------------
-    commission_rate: float = 0.00025       # 佣金 万2.5（以券商为准需确认）
-    min_commission: float = 5.0            # 单笔最低佣金（元，多数券商 5 元，需确认）
-    stamp_tax_rate: float = 0.0005         # 印花税 卖出 0.05%（2023-08 减半后口径，政策以最新为准）
-    transfer_fee_rate: float = 0.00001     # 过户费 0.001% 双向（沪市，需确认）
+    commission_rate: float = 0.00025  # 佣金 万2.5（以券商为准需确认）
+    min_commission: float = 5.0  # 单笔最低佣金（元，多数券商 5 元，需确认）
+    stamp_tax_rate: float = 0.0005  # 印花税 卖出 0.05%（2023-08 减半后口径，政策以最新为准）
+    transfer_fee_rate: float = 0.00001  # 过户费 0.001% 双向（沪市，需确认）
 
     # ETF 豁免项
-    etf_exempt_stamp_tax: bool = True      # ETF 免印花税（需确认）
-    etf_exempt_transfer_fee: bool = True   # ETF 免过户费（需确认）
+    etf_exempt_stamp_tax: bool = True  # ETF 免印花税（需确认）
+    etf_exempt_transfer_fee: bool = True  # ETF 免过户费（需确认）
 
     # ------------------------------------------------------------------
     # 买卖价差（半价差模型，按流动性可配）
     # ------------------------------------------------------------------
-    spread_rate: float = 0.0002            # 全价差 2bp（买卖各承担半价差 1bp，按流动性可配）
+    spread_rate: float = 0.0002  # 全价差 2bp（买卖各承担半价差 1bp，按流动性可配）
 
     # ------------------------------------------------------------------
     # 冲击成本（按成交量占比的冲击函数）
     # ------------------------------------------------------------------
-    impact_model: str = IMPACT_SQRT        # sqrt | linear
-    impact_coef: float = 0.05              # 冲击系数（100% 参与率时 sqrt 冲击 ≈ 5%，需确认）
-    participation_cap: float = 1.0         # 参与率上限（防止异常成交量导致冲击爆炸）
+    impact_model: str = IMPACT_SQRT  # sqrt | linear
+    impact_coef: float = 0.05  # 冲击系数（100% 参与率时 sqrt 冲击 ≈ 5%，需确认）
+    participation_cap: float = 1.0  # 参与率上限（防止异常成交量导致冲击爆炸）
 
     # ------------------------------------------------------------------
     # 篮子成本（ETF 篮子同步执行）
     # ------------------------------------------------------------------
-    basket_slippage_bps: float = 1.0       # 篮子整体滑点加成（bp，同步执行冲击，需确认）
+    basket_slippage_bps: float = 1.0  # 篮子整体滑点加成（bp，同步执行冲击，需确认）
 
     def validate(self) -> None:
         """校验参数合法性，非法直接抛 ValueError。"""

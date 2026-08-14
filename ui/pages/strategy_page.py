@@ -19,7 +19,8 @@ def render() -> None:
 
     strategy_names = registry.list_names()
     selected_name = st.selectbox(
-        "Strategy", strategy_names,
+        "Strategy",
+        strategy_names,
         index=strategy_names.index(st.session_state.get(KEYS["strategy_name"], strategy_names[0])),
     )
     strategy_cls = registry.get(selected_name)
@@ -37,15 +38,21 @@ def render() -> None:
         with cols[col_idx]:
             if info["type"] == "int":
                 params[key] = st.slider(
-                    info["label"], info["min"], info["max"],
-                    value=info["default"], step=info["step"], help=info["help"],
+                    info["label"],
+                    info["min"],
+                    info["max"],
+                    value=info["default"],
+                    step=info["step"],
+                    help=info["help"],
                     key=f"param_{key}",
                 )
             elif info["type"] == "choice":
                 params[key] = st.selectbox(
-                    info["label"], info["choices"],
+                    info["label"],
+                    info["choices"],
                     index=info["choices"].index(info["default"]),
-                    help=info["help"], key=f"param_{key}",
+                    help=info["help"],
+                    key=f"param_{key}",
                 )
 
     # Create strategy instance and store
@@ -59,10 +66,7 @@ def render() -> None:
     st.subheader("Signal Preview")
     signals = strategy.generate_signals(data)
 
-    if isinstance(data.columns, pd.MultiIndex):
-        ticker = data.columns.levels[0][0]
-    else:
-        ticker = "Stock"
+    ticker = data.columns.levels[0][0] if isinstance(data.columns, pd.MultiIndex) else "Stock"
 
     signals_df = pd.DataFrame({"signal": signals}, index=data.index)
 

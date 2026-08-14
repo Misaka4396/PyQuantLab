@@ -5,11 +5,10 @@
 引擎在买入前用 ``can_afford(cash_out)`` 校验（cash_out 已含手续费），
 因此"可用资金"天然覆盖手续费预留。
 """
+
 from __future__ import annotations
 
-from typing import Dict
-
-from engine.events import BUY, SELL, FillEvent
+from engine.events import BUY, FillEvent
 
 
 class Portfolio:
@@ -18,8 +17,8 @@ class Portfolio:
     def __init__(self, initial_cash: float):
         self.initial_cash = float(initial_cash)
         self.cash = float(initial_cash)
-        self.positions: Dict[str, float] = {}   # symbol -> 持仓数量
-        self.total_fees: float = 0.0            # 累计已支付手续费
+        self.positions: dict[str, float] = {}  # symbol -> 持仓数量
+        self.total_fees: float = 0.0  # 累计已支付手续费
 
     # ------------------------------------------------------------------
     # 资金与持仓变更
@@ -42,11 +41,13 @@ class Portfolio:
     # ------------------------------------------------------------------
     # 估值
     # ------------------------------------------------------------------
-    def market_value(self, prices: Dict[str, float]) -> float:
+    def market_value(self, prices: dict[str, float]) -> float:
         """按给定价格表计算持仓市值。"""
-        return sum(qty * prices[sym] for sym, qty in self.positions.items() if sym in prices and qty != 0)
+        return sum(
+            qty * prices[sym] for sym, qty in self.positions.items() if sym in prices and qty != 0
+        )
 
-    def equity(self, prices: Dict[str, float]) -> float:
+    def equity(self, prices: dict[str, float]) -> float:
         """总权益 = 现金 + 持仓市值。"""
         return self.cash + self.market_value(prices)
 
@@ -65,7 +66,7 @@ class Portfolio:
     # ------------------------------------------------------------------
     # 快照
     # ------------------------------------------------------------------
-    def snapshot(self, prices: Dict[str, float]) -> dict:
+    def snapshot(self, prices: dict[str, float]) -> dict:
         """生成组合快照（供 PortfolioEvent 与盯市记录使用）。"""
         return {
             "cash": self.cash,

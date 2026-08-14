@@ -1,0 +1,22 @@
+# pre-commit hooks（P3 规范落地：提交前自动 lint/format/基础检查）
+# 安装: pip install pre-commit && pre-commit install
+# 手动运行全量: pre-commit run --all-files
+repos:
+  # ruff: lint + format（与 CI 一致；经 SSH over 443 拉取，避开 github.com:443 封锁）
+  - repo: ssh://git@ssh.github.com:443/astral-sh/ruff-pre-commit.git
+    rev: v0.12.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # 通用文件检查
+  - repo: ssh://git@ssh.github.com:443/pre-commit/pre-commit-hooks.git
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=2048"]
+      - id: check-merge-conflict

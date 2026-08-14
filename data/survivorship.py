@@ -4,23 +4,24 @@
 本模块记录每只股票完整的会员生命周期（调入生效日、调出/退市生效日、公告日），
 使任意历史时点都能还原"当时真正可交易的股票集合"。
 """
+
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Iterable, List, Optional, Union
 
 import pandas as pd
 
 from core.exceptions import DataError
 from data import schemas as sc
 
-DateLike = Union[str, datetime, pd.Timestamp]
+DateLike = str | datetime | pd.Timestamp
 
 __all__ = [
     "UniverseTracker",
     "build_tradeable_universe",
-    "filter_universe",
     "detect_survivorship_bias",
+    "filter_universe",
 ]
 
 
@@ -42,9 +43,9 @@ class UniverseTracker:
         self,
         symbol: str,
         entry_date: DateLike,
-        exit_date: Optional[DateLike] = None,
+        exit_date: DateLike | None = None,
         reason: str = sc.REASON_ADD,
-        as_of: Optional[DateLike] = None,
+        as_of: DateLike | None = None,
     ) -> None:
         """登记一条会员记录。
 
@@ -58,14 +59,16 @@ class UniverseTracker:
             raise DataError(f"{symbol} 调出日早于调入日: {exit_ts} < {entry}")
         known = entry if as_of is None else pd.Timestamp(as_of)
         row = pd.DataFrame(
-            [{
-                sc.COL_INDEX_CODE: self.index_code,
-                sc.COL_SYMBOL: symbol,
-                sc.COL_ENTRY_DATE: entry,
-                sc.COL_EXIT_DATE: exit_ts,
-                sc.COL_AS_OF: known,
-                sc.COL_REASON: reason,
-            }]
+            [
+                {
+                    sc.COL_INDEX_CODE: self.index_code,
+                    sc.COL_SYMBOL: symbol,
+                    sc.COL_ENTRY_DATE: entry,
+                    sc.COL_EXIT_DATE: exit_ts,
+                    sc.COL_AS_OF: known,
+                    sc.COL_REASON: reason,
+                }
+            ]
         )
         if self._records.empty:
             self._records = row
@@ -88,7 +91,7 @@ class UniverseTracker:
         """返回全部会员记录 DataFrame。"""
         return self._records.copy()
 
-    def get_all_symbols(self) -> List[str]:
+    def get_all_symbols(self) -> list[str]:
         """返回历史上出现过的全部证券代码（含已退市/已调出）。"""
         if self._records.empty:
             return []
@@ -100,14 +103,14 @@ class UniverseTracker:
             return _empty_membership()
         return self._records[self._records[sc.COL_SYMBOL] == symbol].copy()
 
-    def get_delisted(self) -> List[str]:
+    def get_delisted(self) -> list[str]:
         """返回已退出（调出或退市）的证券代码列表。"""
         if self._records.empty:
             return []
         mask = self._records[sc.COL_EXIT_DATE].notna()
         return sorted(self._records.loc[mask, sc.COL_SYMBOL].unique().tolist())
 
-    def get_universe(self, as_of: DateLike) -> List[str]:
+    def get_universe(self, as_of: DateLike) -> list[str]:
         """返回 as_of 时点可交易的股票集合（生效日已到、尚未退出、记录已公告）。"""
         return build_tradeable_universe(self._records, as_of)
 
@@ -124,7 +127,7 @@ def filter_universe(membership: pd.DataFrame, as_of: DateLike) -> pd.DataFrame:
     return df.loc[entry_ok & exit_active & known_ok].copy()
 
 
-def build_tradeable_universe(membership: pd.DataFrame, as_of: DateLike) -> List[str]:
+def build_tradeable_universe(membership: pd.DataFrame, as_of: DateLike) -> list[str]:
     """返回 as_of 时点"当时可交易全集"（证券代码列表，已排序去重）。
 
     三重过滤：

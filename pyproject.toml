@@ -1,0 +1,99 @@
+[project]
+name = "PyQuantLab"
+version = "1.2.2"
+description = "Python 量化交易平台：回测数据治理 / 事件驱动引擎 / ETF 套利 / ML-DL 建模"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+# ---------------------------------------------------------------------------
+# ruff：lint + format（P3 规范落地）
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+exclude = ["dist", "build", "data_cache", "tests/__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "C4",   # flake8-comprehensions
+    "RUF",  # ruff 专属
+]
+ignore = [
+    "E501",  # 行宽由 ruff format 统一管理
+    "B008",  # dataclass field(default_factory=...) 允许
+    "RUF012",  # dataclass 类属性不强制注解
+    "RUF001",  # 中文项目：字符串中的 CJK 非"模糊字符"
+    "RUF002",  # 同上（docstring）
+    "RUF003",  # 同上（注释）
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "S101"]
+# K 线惯例变量 o/h/l/c，忽略模糊变量名检查
+"ui/components/charts.py" = ["E741"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# ---------------------------------------------------------------------------
+# mypy：类型检查（宽松模式，第三方库无 stub 忽略）
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = false
+warn_unused_ignores = false
+exclude = ["dist/", "build/", "data_cache/"]
+
+# ---------------------------------------------------------------------------
+# pytest：测试发现与覆盖率门禁
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --tb=short"
+
+[tool.coverage.run]
+branch = true
+# 覆盖率门禁范围：A/B/C 新专项 + 核心支撑模块（v1.0 旧模块待逐步补测）
+source = ["data", "engine", "etf", "ml", "backtest", "cost_model", "cost_config", "core"]
+omit = [
+    "*/__init__.py",
+    "tests/*",
+    # ---- v1.0 旧模块（无测试，待补测后纳入门禁）----
+    "ui/*",
+    "ui/**/*",
+    "strategy/*",
+    "portfolio/*",
+    "backtest/engine.py",
+    "backtest/metrics.py",
+    "backtest/risk.py",
+    "data/cache.py",
+    "data/downloader.py",
+    "data/live_data.py",
+    "data/manager.py",
+    "data/transform.py",
+    "data/demo_data.py",
+    # ---- 入口/打包辅助 ----
+    "launcher*.py",
+    "app.py",
+    "runtime_hook*.py",
+    "ml_trainer_cli.py",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

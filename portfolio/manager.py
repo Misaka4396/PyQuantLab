@@ -1,13 +1,11 @@
 """Multi-asset portfolio management and position tracking."""
 
-from typing import List, Optional
-
 import numpy as np
 import pandas as pd
 
 
 class PortfolioManager:
-    def __init__(self, assets: List[str], weights: Optional[np.ndarray] = None):
+    def __init__(self, assets: list[str], weights: np.ndarray | None = None):
         self.assets = assets
         if weights is None:
             weights = np.ones(len(assets)) / len(assets)
@@ -15,7 +13,7 @@ class PortfolioManager:
 
     def compute_portfolio_returns(self, returns_df: pd.DataFrame) -> pd.Series:
         common = returns_df.columns.intersection(self.assets)
-        w = self.weights[:len(common)]
+        w = self.weights[: len(common)]
         w = w / w.sum()
         return returns_df[common].dot(w)
 
@@ -26,7 +24,7 @@ class PortfolioManager:
         if not common_assets:
             return pd.Series(initial, index=prices_df.index)
         norm = prices_df[common_assets] / prices_df[common_assets].iloc[0]
-        w = self.weights[:len(common_assets)] / self.weights[:len(common_assets)].sum()
+        w = self.weights[: len(common_assets)] / self.weights[: len(common_assets)].sum()
         port_norm = norm.dot(w)
         return port_norm * initial
 

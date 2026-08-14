@@ -30,19 +30,37 @@ def render() -> None:
     col1, col2, col3 = st.columns(3)
     with col1:
         capital = st.number_input(
-            "Initial Capital ($)", min_value=1000, max_value=10_000_000,
-            value=DEFAULT_INITIAL_CAPITAL, step=10000, format="%d",
+            "Initial Capital ($)",
+            min_value=1000,
+            max_value=10_000_000,
+            value=DEFAULT_INITIAL_CAPITAL,
+            step=10000,
+            format="%d",
         )
     with col2:
-        commission = st.number_input(
-            "Commission (%)", min_value=0.0, max_value=1.0,
-            value=DEFAULT_COMMISSION * 100, step=0.01, format="%.3f",
-        ) / 100
+        commission = (
+            st.number_input(
+                "Commission (%)",
+                min_value=0.0,
+                max_value=1.0,
+                value=DEFAULT_COMMISSION * 100,
+                step=0.01,
+                format="%.3f",
+            )
+            / 100
+        )
     with col3:
-        slippage = st.number_input(
-            "Slippage (%)", min_value=0.0, max_value=1.0,
-            value=DEFAULT_SLIPPAGE * 100, step=0.01, format="%.3f",
-        ) / 100
+        slippage = (
+            st.number_input(
+                "Slippage (%)",
+                min_value=0.0,
+                max_value=1.0,
+                value=DEFAULT_SLIPPAGE * 100,
+                step=0.01,
+                format="%.3f",
+            )
+            / 100
+        )
 
     # Strategy info
     st.caption(f"**Strategy:** {strategy_name} | **Params:** {strategy_params}")
@@ -84,7 +102,7 @@ def render() -> None:
 
     if result is not None:
         st.divider()
-        report = BacktestReport(result)
+        BacktestReport(result)
 
         # KPI cards
         m = result.metrics
@@ -97,7 +115,7 @@ def render() -> None:
             ("Win Rate", f"{m.win_rate * 100:.1f}%"),
             ("Trades", str(m.total_trades)),
         ]
-        for col, (label, value) in zip(cols_kpi, kpis):
+        for col, (label, value) in zip(cols_kpi, kpis, strict=False):
             col.metric(label, value)
 
         # Equity curve
@@ -110,15 +128,18 @@ def render() -> None:
             comp_rows = []
             for name, r in results_dict.items():
                 rm = r.metrics
-                comp_rows.append({
-                    "Strategy": name,
-                    "Total Return": f"{rm.total_return * 100:.2f}%",
-                    "Sharpe": f"{rm.sharpe_ratio:.2f}",
-                    "Max DD": f"{rm.max_drawdown * 100:.2f}%",
-                    "Win Rate": f"{rm.win_rate * 100:.1f}%",
-                    "Trades": rm.total_trades,
-                })
+                comp_rows.append(
+                    {
+                        "Strategy": name,
+                        "Total Return": f"{rm.total_return * 100:.2f}%",
+                        "Sharpe": f"{rm.sharpe_ratio:.2f}",
+                        "Max DD": f"{rm.max_drawdown * 100:.2f}%",
+                        "Win Rate": f"{rm.win_rate * 100:.1f}%",
+                        "Trades": rm.total_trades,
+                    }
+                )
             import pandas as pd
+
             st.dataframe(
                 pd.DataFrame(comp_rows).set_index("Strategy"),
                 use_container_width=True,

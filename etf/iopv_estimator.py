@@ -9,10 +9,10 @@ IOPV（Indicative Optimized Portfolio Value，盘中参考净值）由交易所�
 其中"价格_i"优先用实时价，缺失（停牌）时用最近有效价（前收盘价兜底），
 这与基金公司在停牌股上采用"最近成交价"的实务口径一致。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -25,8 +25,8 @@ class IOPVResult:
     """一次 IOPV 估算结果。"""
 
     iopv: float
-    used_constituents: int        # 实际参与计算的成分股数量
-    missing_symbols: List[str] = field(default_factory=list)  # 无价格且无兜底的成分股
+    used_constituents: int  # 实际参与计算的成分股数量
+    missing_symbols: list[str] = field(default_factory=list)  # 无价格且无兜底的成分股
 
 
 class IOPVEstimator:
@@ -35,8 +35,8 @@ class IOPVEstimator:
     def estimate(
         self,
         basket: PCFBasket,
-        prices: Dict[str, float],
-        fallback_prices: Optional[Dict[str, float]] = None,
+        prices: dict[str, float],
+        fallback_prices: dict[str, float] | None = None,
     ) -> IOPVResult:
         """估算单时点 IOPV。
 
@@ -48,7 +48,7 @@ class IOPVEstimator:
             raise ValueError("最小申赎单位必须为正")
         total_value = basket.cash_component
         used = 0
-        missing: List[str] = []
+        missing: list[str] = []
         for c in basket.constituents:
             price = prices.get(c.symbol)
             if price is None or not np.isfinite(price) or price <= 0:
@@ -58,14 +58,15 @@ class IOPVEstimator:
                 continue
             total_value += c.quantity * float(price)
             used += 1
-        return IOPVResult(iopv=total_value / basket.creation_unit,
-                          used_constituents=used, missing_symbols=missing)
+        return IOPVResult(
+            iopv=total_value / basket.creation_unit, used_constituents=used, missing_symbols=missing
+        )
 
     def estimate_series(
         self,
         basket: PCFBasket,
         price_df: pd.DataFrame,
-        fallback_prices: Optional[Dict[str, float]] = None,
+        fallback_prices: dict[str, float] | None = None,
     ) -> pd.Series:
         """估算 IOPV 时间序列。
 
@@ -75,7 +76,7 @@ class IOPVEstimator:
         df = price_df.copy()
         df = df.ffill()
         results = []
-        for ts, row in df.iterrows():
+        for _ts, row in df.iterrows():
             prices = {str(k): float(v) for k, v in row.items() if pd.notna(v)}
             res = self.estimate(basket, prices, fallback_prices=fallback_prices)
             results.append(res.iopv)

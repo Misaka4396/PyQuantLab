@@ -1,7 +1,5 @@
 """Mean-variance and risk-parity portfolio optimization using scipy."""
 
-from typing import List, Tuple
-
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
@@ -31,7 +29,14 @@ class PortfolioOptimizer:
             try:
                 w = self._min_vol_for_return(tr)
                 r, v, s = self.annualize_metrics(w)
-                points.append({"return": r, "volatility": v, "sharpe": s, **dict(zip(self.assets, w))})
+                points.append(
+                    {
+                        "return": r,
+                        "volatility": v,
+                        "sharpe": s,
+                        **dict(zip(self.assets, w, strict=False)),
+                    }
+                )
             except Exception:
                 continue
         return pd.DataFrame(points)
@@ -49,8 +54,13 @@ class PortfolioOptimizer:
         if not result.success:
             return self.equal_weight()
         r, v, s = self.annualize_metrics(result.x)
-        return PortfolioWeights(assets=self.assets, weights=result.x, expected_return=r,
-                                expected_volatility=v, sharpe_ratio=s)
+        return PortfolioWeights(
+            assets=self.assets,
+            weights=result.x,
+            expected_return=r,
+            expected_volatility=v,
+            sharpe_ratio=s,
+        )
 
     def min_variance(self) -> PortfolioWeights:
         constraints = {"type": "eq", "fun": lambda x: np.sum(x) - 1}
@@ -64,8 +74,13 @@ class PortfolioOptimizer:
         if not result.success:
             return self.equal_weight()
         r, v, s = self.annualize_metrics(result.x)
-        return PortfolioWeights(assets=self.assets, weights=result.x, expected_return=r,
-                                expected_volatility=v, sharpe_ratio=s)
+        return PortfolioWeights(
+            assets=self.assets,
+            weights=result.x,
+            expected_return=r,
+            expected_volatility=v,
+            sharpe_ratio=s,
+        )
 
     def risk_parity(self) -> PortfolioWeights:
         def risk_budget_error(w):
@@ -80,19 +95,23 @@ class PortfolioOptimizer:
         bounds = tuple((1e-6, 1) for _ in range(self.n))
         x0 = np.ones(self.n) / self.n
 
-        result = minimize(risk_budget_error, x0, bounds=bounds, constraints=constraints, method="SLSQP")
+        result = minimize(
+            risk_budget_error, x0, bounds=bounds, constraints=constraints, method="SLSQP"
+        )
         if not result.success:
             return self.equal_weight()
         w = np.abs(result.x) / np.sum(np.abs(result.x))
         r, v, s = self.annualize_metrics(w)
-        return PortfolioWeights(assets=self.assets, weights=w, expected_return=r,
-                                expected_volatility=v, sharpe_ratio=s)
+        return PortfolioWeights(
+            assets=self.assets, weights=w, expected_return=r, expected_volatility=v, sharpe_ratio=s
+        )
 
     def equal_weight(self) -> PortfolioWeights:
         w = np.ones(self.n) / self.n
         r, v, s = self.annualize_metrics(w)
-        return PortfolioWeights(assets=self.assets, weights=w, expected_return=r,
-                                expected_volatility=v, sharpe_ratio=s)
+        return PortfolioWeights(
+            assets=self.assets, weights=w, expected_return=r, expected_volatility=v, sharpe_ratio=s
+        )
 
     def _min_vol_for_return(self, target_return: float) -> np.ndarray:
         constraints = [
@@ -108,12 +127,12 @@ class PortfolioOptimizer:
         result = minimize(port_vol, x0, bounds=bounds, constraints=constraints, method="SLSQP")
         return result.x if result.success else x0
 
-    def _portfolio_metrics(self, weights: np.ndarray) -> Tuple[float, float]:
+    def _portfolio_metrics(self, weights: np.ndarray) -> tuple[float, float]:
         r = float(weights @ self.mean_returns.values)
         v = float(np.sqrt(weights.T @ self.cov_matrix.values @ weights))
         return r, v
 
-    def annualize_metrics(self, weights: np.ndarray) -> Tuple[float, float, float]:
+    def annualize_metrics(self, weights: np.ndarray) -> tuple[float, float, float]:
         r, v = self._portfolio_metrics(weights)
         s = (r - RISK_FREE_RATE) / v if v > 0 else 0.0
         return r, v, s

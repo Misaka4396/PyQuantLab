@@ -10,6 +10,7 @@ if PROJECT_DIR not in sys.path:
 
 def main():
     from ui.main_window import run_app
+
     run_app()
 
 

@@ -21,23 +21,24 @@ PCF（Portfolio Composition File）是 ETF 每日盘前公布的申赎清单，�
   防止 T 日 PCF 串期：T 日只能用 T-1 日公布的清单（次日生效）。
 - 权重按"数量 × 前收盘价"价值加权归一（无价格时按数量归一），保证权重和 = 1。
 """
+
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Union
 
 import pandas as pd
 
 from core.exceptions import DataError
 from data import schemas as sc
 
-DateLike = Union[str, pd.Timestamp]
+DateLike = str | pd.Timestamp
 
 # 现金替代标志枚举
-CS_ALLOWED = "允许"      # 允许现金替代
-CS_REQUIRED = "必须"      # 必须现金替代
-CS_FORBIDDEN = "禁止"     # 禁止现金替代（必须用股票）
+CS_ALLOWED = "允许"  # 允许现金替代
+CS_REQUIRED = "必须"  # 必须现金替代
+CS_FORBIDDEN = "禁止"  # 禁止现金替代（必须用股票）
 
 
 @dataclass
@@ -48,7 +49,7 @@ class PCFConstituent:
     name: str = ""
     quantity: float = 0.0
     cash_substitute: str = CS_ALLOWED
-    price: Optional[float] = None  # 前收盘价（估算 IOPV/权重用，可选）
+    price: float | None = None  # 前收盘价（估算 IOPV/权重用，可选）
 
 
 @dataclass
@@ -56,21 +57,21 @@ class PCFBasket:
     """一只 ETF 在某交易日的完整申赎清单。"""
 
     etf_code: str
-    trade_date: pd.Timestamp      # 清单交易日（T 日）
+    trade_date: pd.Timestamp  # 清单交易日（T 日）
     effective_date: pd.Timestamp  # 生效日（T+1）
-    creation_unit: float          # 最小申赎单位（份）
-    cash_component: float         # 现金差额
-    constituents: List[PCFConstituent] = field(default_factory=list)
+    creation_unit: float  # 最小申赎单位（份）
+    cash_component: float  # 现金差额
+    constituents: list[PCFConstituent] = field(default_factory=list)
 
     # ------------------------------------------------------------------
     # 派生
     # ------------------------------------------------------------------
-    def weights(self) -> Dict[str, float]:
+    def weights(self) -> dict[str, float]:
         """成分股权重（价值加权 = 数量×前收盘价，无价格时退化为数量加权）。
 
         归一化保证权重之和 = 1。
         """
-        vals: Dict[str, float] = {}
+        vals: dict[str, float] = {}
         for c in self.constituents:
             if c.quantity <= 0:
                 continue
@@ -92,13 +93,18 @@ class PCFBasket:
 
     def to_dataframe(self) -> pd.DataFrame:
         """成分股明细 DataFrame（含 symbol/name/quantity/cash_substitute/price）。"""
-        return pd.DataFrame([{
-            "symbol": c.symbol,
-            "name": c.name,
-            "quantity": c.quantity,
-            "cash_substitute": c.cash_substitute,
-            "price": c.price,
-        } for c in self.constituents])
+        return pd.DataFrame(
+            [
+                {
+                    "symbol": c.symbol,
+                    "name": c.name,
+                    "quantity": c.quantity,
+                    "cash_substitute": c.cash_substitute,
+                    "price": c.price,
+                }
+                for c in self.constituents
+            ]
+        )
 
     def to_pcf_dataframe(self) -> pd.DataFrame:
         """转为 A1 DataLoader.save_pcf 可消费的列（symbol/quantity + 现金差额/申赎单位）。"""
@@ -111,7 +117,7 @@ class PCFBasket:
 # ---------------------------------------------------------------------------
 # 交易日
 # ---------------------------------------------------------------------------
-def next_trading_day(ts: DateLike, calendar: Optional[Iterable[DateLike]] = None) -> pd.Timestamp:
+def next_trading_day(ts: DateLike, calendar: Iterable[DateLike] | None = None) -> pd.Timestamp:
     """返回 ts 的下一个交易日。
 
     - calendar 提供时（升序交易日序列）：返回其中严格大于 ts 的第一个日期。
@@ -131,9 +137,9 @@ def next_trading_day(ts: DateLike, calendar: Optional[Iterable[DateLike]] = None
 # ---------------------------------------------------------------------------
 # 解析
 # ---------------------------------------------------------------------------
-def _parse_header(lines: List[str]) -> Dict[str, str]:
+def _parse_header(lines: list[str]) -> dict[str, str]:
     """解析 key=value 头部（跳过注释/空行）。"""
-    header: Dict[str, str] = {}
+    header: dict[str, str] = {}
     for line in lines:
         s = line.strip()
         if not s or s.startswith("#"):
@@ -147,7 +153,7 @@ def _parse_header(lines: List[str]) -> Dict[str, str]:
 def parse_pcf(text: str) -> PCFBasket:
     """解析 PCF 文本（标准格式或纯 CSV），返回 PCFBasket。"""
     lines = text.splitlines()
-    header = _parse_header([l for l in lines if "[成分股]" not in l])
+    header = _parse_header([ln for ln in lines if "[成分股]" not in ln])
 
     etf_code = header.get("ETF代码") or header.get("etf_code") or ""
     trade_date = header.get("清单日期") or header.get("trade_date") or ""
@@ -172,16 +178,14 @@ def parse_pcf(text: str) -> PCFBasket:
     )
 
 
-def _parse_constituents(lines: List[str]) -> List[PCFConstituent]:
+def _parse_constituents(lines: list[str]) -> list[PCFConstituent]:
     """解析成分股表格（[成分股] 段或纯 CSV 表）。"""
-    rows: List[List[str]] = []
-    in_section = False
+    rows: list[list[str]] = []
     for line in lines:
         s = line.strip()
         if not s or s.startswith("#"):
             continue
         if s.startswith("[") and s.endswith("]"):
-            in_section = (s == "[成分股]")
             continue
         if "=" in s:
             continue  # header 行
@@ -197,7 +201,7 @@ def _parse_constituents(lines: List[str]) -> List[PCFConstituent]:
     if header_row and header_row[0] in ("证券代码", "symbol", "代码"):
         rows = rows[1:]
 
-    out: List[PCFConstituent] = []
+    out: list[PCFConstituent] = []
     for cells in rows:
         if not cells or not cells[0]:
             continue
@@ -211,12 +215,15 @@ def _parse_constituents(lines: List[str]) -> List[PCFConstituent]:
                 price = float(cells[4])
             except ValueError:
                 price = None
-        out.append(PCFConstituent(symbol=symbol, name=name, quantity=quantity,
-                                  cash_substitute=cash_sub, price=price))
+        out.append(
+            PCFConstituent(
+                symbol=symbol, name=name, quantity=quantity, cash_substitute=cash_sub, price=price
+            )
+        )
     return out
 
 
-def parse_pcf_file(path: Union[str, Path]) -> PCFBasket:
+def parse_pcf_file(path: str | Path) -> PCFBasket:
     """读取 PCF 文件并解析。"""
     p = Path(path)
     if not p.exists():
@@ -228,10 +235,10 @@ def pcf_from_dataframe(
     df: pd.DataFrame,
     etf_code: str,
     trade_date: DateLike,
-    effective_date: Optional[DateLike] = None,
+    effective_date: DateLike | None = None,
     creation_unit: float = 0.0,
     cash_component: float = 0.0,
-    calendar: Optional[Iterable[DateLike]] = None,
+    calendar: Iterable[DateLike] | None = None,
 ) -> PCFBasket:
     """由 DataFrame（A1 pcf 表 schema 或含 symbol/quantity 的任意表）构造 PCFBasket。"""
     df = df.copy()
@@ -239,16 +246,22 @@ def pcf_from_dataframe(
         if c not in df.columns:
             raise DataError(f"构造 PCF 缺少列: {c}")
     tdate = pd.Timestamp(trade_date)
-    edate = pd.Timestamp(effective_date) if effective_date is not None else next_trading_day(tdate, calendar)
+    edate = (
+        pd.Timestamp(effective_date)
+        if effective_date is not None
+        else next_trading_day(tdate, calendar)
+    )
     constituents = []
     for _, row in df.iterrows():
-        constituents.append(PCFConstituent(
-            symbol=str(row[sc.COL_SYMBOL]).zfill(6),
-            name=str(row.get("name", "")),
-            quantity=float(row[sc.COL_QUANTITY]),
-            cash_substitute=str(row.get("cash_substitute", CS_ALLOWED)),
-            price=float(row["price"]) if ("price" in row and pd.notna(row["price"])) else None,
-        ))
+        constituents.append(
+            PCFConstituent(
+                symbol=str(row[sc.COL_SYMBOL]).zfill(6),
+                name=str(row.get("name", "")),
+                quantity=float(row[sc.COL_QUANTITY]),
+                cash_substitute=str(row.get("cash_substitute", CS_ALLOWED)),
+                price=float(row["price"]) if ("price" in row and pd.notna(row["price"])) else None,
+            )
+        )
     return PCFBasket(
         etf_code=etf_code,
         trade_date=tdate,
@@ -260,13 +273,13 @@ def pcf_from_dataframe(
 
 
 __all__ = [
-    "PCFConstituent",
+    "CS_ALLOWED",
+    "CS_FORBIDDEN",
+    "CS_REQUIRED",
     "PCFBasket",
+    "PCFConstituent",
+    "next_trading_day",
     "parse_pcf",
     "parse_pcf_file",
     "pcf_from_dataframe",
-    "next_trading_day",
-    "CS_ALLOWED",
-    "CS_REQUIRED",
-    "CS_FORBIDDEN",
 ]

@@ -2,15 +2,15 @@
 
 消费 ``ml.overfit.OverfitAssessment``，渲染为 markdown 文本或落盘 .md 文件。
 """
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Union
 
 from ml.overfit import OverfitAssessment
 
 
-def _fmt(v: Optional[float]) -> str:
+def _fmt(v: float | None) -> str:
     """数值格式化：float 保留 4 位，None 显示 —。"""
     if v is None:
         return "—"
@@ -75,15 +75,17 @@ def render_overfit_report(
 
     lines.append("## 公式来源")
     lines.append("- DSR/PSR：Bailey & López de Prado (2014), *The Deflated Sharpe Ratio*")
-    lines.append("- PBO/CSCV：Bailey, Borwein, López de Prado & Zhu (2015), *The Probability of Backtest Overfitting*")
+    lines.append(
+        "- PBO/CSCV：Bailey, Borwein, López de Prado & Zhu (2015), *The Probability of Backtest Overfitting*"
+    )
     return "\n".join(lines) + "\n"
 
 
 def generate_overfit_report(
     assessment: OverfitAssessment,
-    output_dir: Union[str, Path],
+    output_dir: str | Path,
     name: str = "overfit_report",
-    title: Optional[str] = None,
+    title: str | None = None,
 ) -> str:
     """落盘 markdown 报告，返回文件路径。"""
     out = Path(output_dir)
@@ -95,6 +97,6 @@ def generate_overfit_report(
 
 
 __all__ = [
-    "render_overfit_report",
     "generate_overfit_report",
+    "render_overfit_report",
 ]

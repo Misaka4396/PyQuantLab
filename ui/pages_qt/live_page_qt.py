@@ -2,12 +2,10 @@
 
 from datetime import datetime
 
-import pandas as pd
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QComboBox,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -142,7 +140,9 @@ class LivePage(QWidget):
 
     def _add_ticker(self):
         sym = self.ticker_input.currentText().strip().upper()
-        if sym and sym not in [self.symbols_list.itemText(i) for i in range(self.symbols_list.count())]:
+        if sym and sym not in [
+            self.symbols_list.itemText(i) for i in range(self.symbols_list.count())
+        ]:
             self.symbols_list.addItem(sym)
             self.symbols_list.setCurrentText(sym)
             self._refresh()
@@ -160,7 +160,9 @@ class LivePage(QWidget):
         self.toggle_btn.setEnabled(False)
         symbols = [self.symbols_list.itemText(i) for i in range(self.symbols_list.count())]
         self._quote_thread = run_in_thread(
-            self, self.fetcher.get_current_quotes, symbols,
+            self,
+            self.fetcher.get_current_quotes,
+            symbols,
             on_finished=self._on_quotes_loaded,
             on_error=lambda e: self.toggle_btn.setEnabled(True),
         )
@@ -196,7 +198,8 @@ class LivePage(QWidget):
             return self.fetcher.get_intraday(symbols, period="1d", interval=interval)
 
         self._chart_thread = run_in_thread(
-            self, _fetch_intraday,
+            self,
+            _fetch_intraday,
             on_finished=self._on_chart_loaded,
         )
 

@@ -3,8 +3,8 @@
 import sys
 import types
 
-if getattr(sys, 'frozen', False):
-    sv = types.ModuleType('streamlit.version')
+if getattr(sys, "frozen", False):
+    sv = types.ModuleType("streamlit.version")
 
     # Version strings
     sv.STREAMLIT_VERSION_STRING = "1.22.0"
@@ -33,4 +33,4 @@ if getattr(sys, 'frozen', False):
     sv.CHECK_PYPI_PROBABILITY = 0.0
     sv.PYPI_STREAMLIT_URL = "https://pypi.org/pypi/streamlit/json"
 
-    sys.modules['streamlit.version'] = sv
+    sys.modules["streamlit.version"] = sv

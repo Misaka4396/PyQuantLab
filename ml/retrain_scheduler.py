@@ -4,9 +4,10 @@
 重训；其余步沿用上一模型。每次重训经 ``ModelRegistry.save`` 落新版本，模型与
 数据/特征/超参版本绑定，可回滚。
 """
+
 from __future__ import annotations
 
-from typing import Callable, Dict, Optional, Tuple
+from collections.abc import Callable
 
 import pandas as pd
 
@@ -19,7 +20,7 @@ class RetrainScheduler:
     def __init__(
         self,
         retrain_every: int = 252,
-        registry: Optional[ModelRegistry] = None,
+        registry: ModelRegistry | None = None,
     ):
         if retrain_every < 1:
             raise ValueError("retrain_every 必须为正")
@@ -35,13 +36,13 @@ class RetrainScheduler:
     # ------------------------------------------------------------------
     def run(
         self,
-        train_fn: Callable[[int], Tuple],
+        train_fn: Callable[[int], tuple],
         n_steps: int,
         *,
         task: str = "classification",
         data_version: int = 1,
         feature_version: int = 1,
-        hyperparams: Optional[Dict] = None,
+        hyperparams: dict | None = None,
         seed: int = 42,
     ) -> pd.DataFrame:
         """推进 n_steps，周期触发 ``train_fn(step)`` 重训并版本化，返回调度日志。
@@ -57,15 +58,18 @@ class RetrainScheduler:
             model, metrics = train_fn(step)
             version = None
             if self.registry is not None:
-                version = self.registry.save(model, {
-                    "model_type": "lightgbm",
-                    "task": task,
-                    "data_version": data_version,
-                    "feature_version": feature_version,
-                    "hyperparams": hyperparams,
-                    "seed": seed,
-                    "metrics": metrics,
-                })
+                version = self.registry.save(
+                    model,
+                    {
+                        "model_type": "lightgbm",
+                        "task": task,
+                        "data_version": data_version,
+                        "feature_version": feature_version,
+                        "hyperparams": hyperparams,
+                        "seed": seed,
+                        "metrics": metrics,
+                    },
+                )
             row = {"step": step, "retrained": True, "version": version}
             row.update({f"metric_{k}": v for k, v in (metrics or {}).items()})
             self.log.append(row)

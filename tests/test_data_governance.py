@@ -6,6 +6,7 @@
 - 前复权与已知基准一致
 - 质量报告统计缺失/异常率并输出 markdown
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,9 +20,9 @@ from data.data_loader import DataLoader, clean_ohlcv
 from data.pit import (
     as_of_barrier,
     as_of_mask,
+    backward_adjust,
     compute_adj_factor,
     forward_adjust,
-    backward_adjust,
     normalize_timestamps,
     slice_as_of,
 )
@@ -40,14 +41,17 @@ def make_ohlcv(index, close, volume=1000.0, as_of=None) -> pd.DataFrame:
     """构造标准 OHLCV 长表（index=datetime）。"""
     idx = pd.to_datetime(index)
     close = pd.Series(close, index=idx, dtype=float)
-    df = pd.DataFrame({
-        sc.COL_OPEN: close,
-        sc.COL_HIGH: close * 1.01,
-        sc.COL_LOW: close * 0.99,
-        sc.COL_CLOSE: close,
-        sc.COL_VOLUME: volume,
-        sc.COL_AMOUNT: close * volume,
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            sc.COL_OPEN: close,
+            sc.COL_HIGH: close * 1.01,
+            sc.COL_LOW: close * 0.99,
+            sc.COL_CLOSE: close,
+            sc.COL_VOLUME: volume,
+            sc.COL_AMOUNT: close * volume,
+        },
+        index=idx,
+    )
     df.index.name = sc.COL_DATETIME
     df[sc.COL_AS_OF] = idx if as_of is None else pd.to_datetime(as_of)
     return df
@@ -77,10 +81,12 @@ def test_as_of_barrier_returns_min_as_of():
 
 
 def test_compute_adj_factor():
-    events = pd.DataFrame({
-        sc.COL_EX_DATE: pd.to_datetime(["2024-01-02", "2024-01-03"]),
-        sc.COL_RATIO: [0.5, 0.8],
-    })
+    events = pd.DataFrame(
+        {
+            sc.COL_EX_DATE: pd.to_datetime(["2024-01-02", "2024-01-03"]),
+            sc.COL_RATIO: [0.5, 0.8],
+        }
+    )
     factor = compute_adj_factor(events)
     assert factor[sc.COL_ADJ_FACTOR].tolist() == [0.5, 0.4]
     assert factor.index.name == sc.COL_EX_DATE
@@ -90,10 +96,12 @@ def test_compute_adj_factor():
 def test_forward_adjust_matches_baseline():
     idx = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"])
     prices = pd.Series([10.0, 5.0, 5.5], index=idx)
-    events = pd.DataFrame({
-        sc.COL_EX_DATE: pd.to_datetime(["2024-01-03"]),
-        sc.COL_RATIO: [0.5],
-    })
+    events = pd.DataFrame(
+        {
+            sc.COL_EX_DATE: pd.to_datetime(["2024-01-03"]),
+            sc.COL_RATIO: [0.5],
+        }
+    )
     factor = compute_adj_factor(events)
     qfq = forward_adjust(prices, factor)
     # 10 送 10：除权前 10 元前复权为 5 元，除权后不变，最新价等于原始价
@@ -104,10 +112,12 @@ def test_forward_adjust_matches_baseline():
 def test_backward_adjust():
     idx = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"])
     prices = pd.Series([10.0, 5.0, 5.5], index=idx)
-    events = pd.DataFrame({
-        sc.COL_EX_DATE: pd.to_datetime(["2024-01-03"]),
-        sc.COL_RATIO: [0.5],
-    })
+    events = pd.DataFrame(
+        {
+            sc.COL_EX_DATE: pd.to_datetime(["2024-01-03"]),
+            sc.COL_RATIO: [0.5],
+        }
+    )
     factor = compute_adj_factor(events)
     hfq = backward_adjust(prices, factor)
     pd.testing.assert_series_equal(hfq, pd.Series([10.0, 10.0, 11.0], index=idx), check_names=False)
@@ -117,10 +127,12 @@ def test_forward_adjust_as_of_blocks_future_factor():
     """除权生效日之前不得使用未来的复权因子（防前视）。"""
     idx = pd.to_datetime(["2024-01-02", "2024-01-03", "2024-01-04"])
     prices = pd.Series([10.0, 5.0, 5.5], index=idx)
-    events = pd.DataFrame({
-        sc.COL_EX_DATE: pd.to_datetime(["2024-01-03"]),
-        sc.COL_RATIO: [0.5],
-    })
+    events = pd.DataFrame(
+        {
+            sc.COL_EX_DATE: pd.to_datetime(["2024-01-03"]),
+            sc.COL_RATIO: [0.5],
+        }
+    )
     factor = compute_adj_factor(events)
     qfq = forward_adjust(prices, factor, as_of="2024-01-02")
     pd.testing.assert_series_equal(qfq, prices, check_names=False)
@@ -156,12 +168,14 @@ def test_universe_tracker_announcement_vs_effective():
 
 
 def test_build_tradeable_universe():
-    memb = pd.DataFrame({
-        sc.COL_SYMBOL: ["A", "B", "C"],
-        sc.COL_ENTRY_DATE: pd.to_datetime(["2024-01-01", "2024-01-01", "2024-06-01"]),
-        sc.COL_EXIT_DATE: [pd.NaT, pd.Timestamp("2024-06-01"), pd.NaT],
-        sc.COL_AS_OF: pd.to_datetime(["2024-01-01", "2024-01-01", "2024-06-01"]),
-    })
+    memb = pd.DataFrame(
+        {
+            sc.COL_SYMBOL: ["A", "B", "C"],
+            sc.COL_ENTRY_DATE: pd.to_datetime(["2024-01-01", "2024-01-01", "2024-06-01"]),
+            sc.COL_EXIT_DATE: [pd.NaT, pd.Timestamp("2024-06-01"), pd.NaT],
+            sc.COL_AS_OF: pd.to_datetime(["2024-01-01", "2024-01-01", "2024-06-01"]),
+        }
+    )
     assert build_tradeable_universe(memb, "2024-03-01") == ["A", "B"]
     assert build_tradeable_universe(memb, "2024-07-01") == ["A", "C"]
 
@@ -176,14 +190,17 @@ def test_detect_survivorship_bias():
 # ---------------------------------------------------------------------------
 def test_clean_ohlcv_dedupe_and_nonpositive():
     idx = pd.to_datetime(["2024-01-01", "2024-01-01", "2024-01-02", "2024-01-03"])
-    df = pd.DataFrame({
-        sc.COL_OPEN: [10, 10, 10, 0],
-        sc.COL_HIGH: [11, 11, 11, 9],
-        sc.COL_LOW: [9, 9, 9, 8],
-        sc.COL_CLOSE: [10, 10, 10, -5],
-        sc.COL_VOLUME: [100, 100, 100, 0],
-        sc.COL_AMOUNT: [1000, 1000, 1000, 0],
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            sc.COL_OPEN: [10, 10, 10, 0],
+            sc.COL_HIGH: [11, 11, 11, 9],
+            sc.COL_LOW: [9, 9, 9, 8],
+            sc.COL_CLOSE: [10, 10, 10, -5],
+            sc.COL_VOLUME: [100, 100, 100, 0],
+            sc.COL_AMOUNT: [1000, 1000, 1000, 0],
+        },
+        index=idx,
+    )
     df.index.name = sc.COL_DATETIME
     cleaned = clean_ohlcv(df)
     assert not cleaned.index.duplicated().any()
@@ -193,14 +210,17 @@ def test_clean_ohlcv_dedupe_and_nonpositive():
 
 def test_clean_ohlcv_flags_limit_up():
     idx = pd.to_datetime(["2024-01-01", "2024-01-02"])
-    df = pd.DataFrame({
-        sc.COL_OPEN: [10, 11],
-        sc.COL_HIGH: [10, 11],
-        sc.COL_LOW: [10, 11],
-        sc.COL_CLOSE: [10, 11],
-        sc.COL_VOLUME: [1000, 1000],
-        sc.COL_AMOUNT: [10000, 11000],
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            sc.COL_OPEN: [10, 11],
+            sc.COL_HIGH: [10, 11],
+            sc.COL_LOW: [10, 11],
+            sc.COL_CLOSE: [10, 11],
+            sc.COL_VOLUME: [1000, 1000],
+            sc.COL_AMOUNT: [10000, 11000],
+        },
+        index=idx,
+    )
     df.index.name = sc.COL_DATETIME
     cleaned = clean_ohlcv(df, limit_pct=0.10)
     assert cleaned[sc.COL_LIMIT_STATUS].iloc[0] == sc.LIMIT_NORMAL
@@ -209,14 +229,17 @@ def test_clean_ohlcv_flags_limit_up():
 
 def test_clean_ohlcv_flags_suspension():
     idx = pd.to_datetime(["2024-01-01", "2024-01-02"])
-    df = pd.DataFrame({
-        sc.COL_OPEN: [10, 10],
-        sc.COL_HIGH: [10, 10],
-        sc.COL_LOW: [10, 10],
-        sc.COL_CLOSE: [10, 10],
-        sc.COL_VOLUME: [1000, 0],
-        sc.COL_AMOUNT: [10000, 0],
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            sc.COL_OPEN: [10, 10],
+            sc.COL_HIGH: [10, 10],
+            sc.COL_LOW: [10, 10],
+            sc.COL_CLOSE: [10, 10],
+            sc.COL_VOLUME: [1000, 0],
+            sc.COL_AMOUNT: [10000, 0],
+        },
+        index=idx,
+    )
     df.index.name = sc.COL_DATETIME
     cleaned = clean_ohlcv(df)
     assert cleaned[sc.COL_IS_SUSPENDED].iloc[1]
@@ -231,7 +254,9 @@ def test_data_loader_ohlcv_roundtrip(tmp_path):
     df = make_ohlcv(["2024-01-01", "2024-01-02", "2024-01-03"], [10.0, 10.5, 10.8])
     loader.save_ohlcv("510300", df)
     loaded = loader.load_ohlcv("510300")
-    assert loaded.index.tolist() == pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]).tolist()
+    assert (
+        loaded.index.tolist() == pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]).tolist()
+    )
     assert loaded[sc.COL_CLOSE].tolist() == [10.0, 10.5, 10.8]
     assert (loaded[sc.COL_SYMBOL] == "510300").all()
     assert sc.COL_AS_OF in loaded.columns
@@ -254,9 +279,20 @@ def test_data_loader_incremental_update(tmp_path):
     idx2 = pd.to_datetime(["2024-01-04", "2024-01-05", "2024-01-06", "2024-01-07"])
     loader.incremental_update_ohlcv("X", make_ohlcv(idx2, [20.0] * 4))
     out = loader.load_ohlcv("X", clean=False)
-    assert out.index.tolist() == pd.to_datetime(
-        ["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05", "2024-01-06", "2024-01-07"]
-    ).tolist()
+    assert (
+        out.index.tolist()
+        == pd.to_datetime(
+            [
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+                "2024-01-06",
+                "2024-01-07",
+            ]
+        ).tolist()
+    )
     assert not out.index.duplicated().any()
     assert out.loc[pd.Timestamp("2024-01-04"), sc.COL_CLOSE] == 20.0
     assert out.loc[pd.Timestamp("2024-01-03"), sc.COL_CLOSE] == 10.0
@@ -264,12 +300,14 @@ def test_data_loader_incremental_update(tmp_path):
 
 def test_data_loader_constituents_and_universe(tmp_path):
     loader = DataLoader(tmp_path)
-    memb = pd.DataFrame({
-        sc.COL_SYMBOL: ["600000", "000002", "601318"],
-        sc.COL_ENTRY_DATE: pd.to_datetime(["2024-01-01", "2024-01-01", "2024-06-01"]),
-        sc.COL_EXIT_DATE: [pd.NaT, pd.Timestamp("2024-06-01"), pd.NaT],
-        sc.COL_REASON: [sc.REASON_INITIAL, sc.REASON_DELIST, sc.REASON_ADD],
-    })
+    memb = pd.DataFrame(
+        {
+            sc.COL_SYMBOL: ["600000", "000002", "601318"],
+            sc.COL_ENTRY_DATE: pd.to_datetime(["2024-01-01", "2024-01-01", "2024-06-01"]),
+            sc.COL_EXIT_DATE: [pd.NaT, pd.Timestamp("2024-06-01"), pd.NaT],
+            sc.COL_REASON: [sc.REASON_INITIAL, sc.REASON_DELIST, sc.REASON_ADD],
+        }
+    )
     loader.save_constituents("000300", memb)
     before = loader.get_tradeable_universe("000300", "2024-03-01")
     after = loader.get_tradeable_universe("000300", "2024-07-01")
@@ -280,16 +318,24 @@ def test_data_loader_constituents_and_universe(tmp_path):
 def test_data_loader_adj_factor_nav_pcf_roundtrip(tmp_path):
     loader = DataLoader(tmp_path)
     # 复权因子
-    loader.save_adj_factor("510300", pd.DataFrame({
-        sc.COL_EX_DATE: [pd.Timestamp("2024-06-01")],
-        sc.COL_RATIO: [0.8],
-    }))
+    loader.save_adj_factor(
+        "510300",
+        pd.DataFrame(
+            {
+                sc.COL_EX_DATE: [pd.Timestamp("2024-06-01")],
+                sc.COL_RATIO: [0.8],
+            }
+        ),
+    )
     assert loader.load_adj_factor("510300")[sc.COL_ADJ_FACTOR].iloc[-1] == 0.8
     # NAV
-    nav = pd.DataFrame({
-        sc.COL_NAV: [3.0, 3.1],
-        sc.COL_IOPV: [3.0, 3.11],
-    }, index=pd.to_datetime(["2024-01-01", "2024-01-02"]))
+    nav = pd.DataFrame(
+        {
+            sc.COL_NAV: [3.0, 3.1],
+            sc.COL_IOPV: [3.0, 3.11],
+        },
+        index=pd.to_datetime(["2024-01-01", "2024-01-02"]),
+    )
     nav.index.name = sc.COL_DATETIME
     loader.save_nav("510300", nav)
     assert loader.load_nav("510300")[sc.COL_NAV].tolist() == [3.0, 3.1]
@@ -305,14 +351,17 @@ def test_data_loader_adj_factor_nav_pcf_roundtrip(tmp_path):
 def test_quality_report_computes_rates():
     reporter = QualityReporter(limit_pct=0.10)
     idx = pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04"])
-    df = pd.DataFrame({
-        sc.COL_OPEN: [10, 10, 10, 10],
-        sc.COL_HIGH: [11, 11, 11, 9],
-        sc.COL_LOW: [9, 9, 9, 10],
-        sc.COL_CLOSE: [10, np.nan, 10, 10],
-        sc.COL_VOLUME: [1000, 1000, 1000, 1000],
-        sc.COL_AMOUNT: [10000, 10000, 10000, 10000],
-    }, index=idx)
+    df = pd.DataFrame(
+        {
+            sc.COL_OPEN: [10, 10, 10, 10],
+            sc.COL_HIGH: [11, 11, 11, 9],
+            sc.COL_LOW: [9, 9, 9, 10],
+            sc.COL_CLOSE: [10, np.nan, 10, 10],
+            sc.COL_VOLUME: [1000, 1000, 1000, 1000],
+            sc.COL_AMOUNT: [10000, 10000, 10000, 10000],
+        },
+        index=idx,
+    )
     df.index.name = sc.COL_DATETIME
     df.loc[idx[0], sc.COL_OPEN] = -1.0  # 制造一个非正价异常
     stats = reporter.inspect_ohlcv(df)

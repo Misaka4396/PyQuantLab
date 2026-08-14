@@ -1,7 +1,5 @@
 """Matplotlib chart factories for PyQt5 embedding."""
 
-from typing import Optional
-
 import matplotlib
 import matplotlib.font_manager as fm
 import numpy as np
@@ -15,16 +13,16 @@ matplotlib.use("Qt5Agg")
 FONT_SIZE = 12
 _font_configured = False
 for f in fm.findSystemFonts():
-    if 'msyh' in f.lower() or 'yahei' in f.lower():
+    if "msyh" in f.lower() or "yahei" in f.lower():
         try:
             fm.fontManager.addfont(f)
-            matplotlib.rcParams['font.family'] = 'Microsoft YaHei'
+            matplotlib.rcParams["font.family"] = "Microsoft YaHei"
             _font_configured = True
         except Exception:
             pass
         break
-matplotlib.rcParams['font.size'] = FONT_SIZE
-matplotlib.rcParams['axes.unicode_minus'] = False
+matplotlib.rcParams["font.size"] = FONT_SIZE
+matplotlib.rcParams["axes.unicode_minus"] = False
 
 
 def _make_fig_ax(rows=1, cols=1, figsize=(8, 5)):
@@ -62,7 +60,7 @@ def equity_curve_chart(equity_curve: pd.DataFrame) -> MplCanvas:
     return MplCanvas(fig)
 
 
-def price_chart(data: pd.DataFrame, signals: Optional[pd.DataFrame] = None) -> MplCanvas:
+def price_chart(data: pd.DataFrame, signals: pd.DataFrame | None = None) -> MplCanvas:
     fig, ax = _make_fig_ax(figsize=(10, 4.5))
 
     if isinstance(data.columns, pd.MultiIndex):
@@ -85,11 +83,25 @@ def price_chart(data: pd.DataFrame, signals: Optional[pd.DataFrame] = None) -> M
         buy_aligned = buy_idx.intersection(close_aligned.dropna().index)
         sell_aligned = sell_idx.intersection(close_aligned.dropna().index)
         if len(buy_aligned) > 0:
-            ax.scatter(buy_aligned, close_aligned.loc[buy_aligned], marker="^",
-                       color="green", s=80, zorder=5, label="买入")
+            ax.scatter(
+                buy_aligned,
+                close_aligned.loc[buy_aligned],
+                marker="^",
+                color="green",
+                s=80,
+                zorder=5,
+                label="买入",
+            )
         if len(sell_aligned) > 0:
-            ax.scatter(sell_aligned, close_aligned.loc[sell_aligned], marker="v",
-                       color="red", s=80, zorder=5, label="卖出")
+            ax.scatter(
+                sell_aligned,
+                close_aligned.loc[sell_aligned],
+                marker="v",
+                color="red",
+                s=80,
+                zorder=5,
+                label="卖出",
+            )
 
     ax.legend(loc="upper left")
     ax.tick_params(axis="x", rotation=30)
@@ -102,7 +114,7 @@ def returns_histogram(returns: pd.Series) -> MplCanvas:
     ax.hist(clean, bins=60, color="#42a5f5", alpha=0.7, density=True)
     x = np.linspace(clean.min(), clean.max(), 200)
     y = (1 / (clean.std() * np.sqrt(2 * np.pi))) * np.exp(
-        -(x - clean.mean()) ** 2 / (2 * clean.std() ** 2)
+        -((x - clean.mean()) ** 2) / (2 * clean.std() ** 2)
     )
     ax.plot(x, y, color="orange", linewidth=2, label="正态拟合")
     ax.set_title("收益率分布")
@@ -113,12 +125,27 @@ def returns_histogram(returns: pd.Series) -> MplCanvas:
 
 def efficient_frontier_chart(frontier: pd.DataFrame, optimal=None) -> MplCanvas:
     fig, ax = _make_fig_ax(figsize=(8, 5))
-    ax.plot(frontier["volatility"], frontier["return"], "o-",
-            color="steelblue", markersize=4, alpha=0.7, label="有效前沿")
+    ax.plot(
+        frontier["volatility"],
+        frontier["return"],
+        "o-",
+        color="steelblue",
+        markersize=4,
+        alpha=0.7,
+        label="有效前沿",
+    )
     if optimal is not None:
-        ax.scatter([optimal.expected_volatility], [optimal.expected_return],
-                   marker="*", s=300, color="gold", edgecolors="darkgoldenrod",
-                   linewidths=1.5, zorder=5, label="最大夏普比率")
+        ax.scatter(
+            [optimal.expected_volatility],
+            [optimal.expected_return],
+            marker="*",
+            s=300,
+            color="gold",
+            edgecolors="darkgoldenrod",
+            linewidths=1.5,
+            zorder=5,
+            label="最大夏普比率",
+        )
     ax.set_xlabel("年化波动率")
     ax.set_ylabel("年化收益率")
     ax.set_title("有效前沿")
@@ -130,10 +157,12 @@ def efficient_frontier_chart(frontier: pd.DataFrame, optimal=None) -> MplCanvas:
 def monte_carlo_chart(percentiles: pd.DataFrame) -> MplCanvas:
     fig, ax = _make_fig_ax(figsize=(8, 4.5))
     x = range(len(percentiles))
-    ax.fill_between(x, percentiles["p5"], percentiles["p95"],
-                    color="#42a5f5", alpha=0.1, label="90% 置信区间")
-    ax.fill_between(x, percentiles["p25"], percentiles["p75"],
-                    color="#42a5f5", alpha=0.2, label="50% 置信区间")
+    ax.fill_between(
+        x, percentiles["p5"], percentiles["p95"], color="#42a5f5", alpha=0.1, label="90% 置信区间"
+    )
+    ax.fill_between(
+        x, percentiles["p25"], percentiles["p75"], color="#42a5f5", alpha=0.2, label="50% 置信区间"
+    )
     ax.plot(x, percentiles["p50"], color="#26a69a", linewidth=2, label="中位数")
     ax.set_ylabel("组合价值")
     ax.set_title("蒙特卡洛模拟")
@@ -158,8 +187,7 @@ def live_price_chart(prices: pd.DataFrame) -> MplCanvas:
     for i, col in enumerate(prices.columns):
         s = prices[col].dropna()
         if len(s) > 0:
-            ax.plot(s.index, s.values, color=colors[i % len(colors)],
-                    linewidth=1.5, label=col)
+            ax.plot(s.index, s.values, color=colors[i % len(colors)], linewidth=1.5, label=col)
     ax.set_title("日内价格走势")
     ax.set_ylabel("价格 ($)")
     ax.legend(loc="upper left")

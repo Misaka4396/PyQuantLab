@@ -1,7 +1,5 @@
 """Risk analysis utilities — rolling metrics, drawdown analysis, stress testing."""
 
-from typing import Dict
-
 import numpy as np
 import pandas as pd
 
@@ -25,9 +23,7 @@ class RiskAnalyzer:
         return returns.rolling(window=window).std() * np.sqrt(RiskAnalyzer.TRADING_DAYS)
 
     @staticmethod
-    def rolling_beta(
-        returns: pd.Series, benchmark: pd.Series, window: int = 252
-    ) -> pd.Series:
+    def rolling_beta(returns: pd.Series, benchmark: pd.Series, window: int = 252) -> pd.Series:
         aligned = pd.concat([returns, benchmark], axis=1).dropna()
         r = aligned.iloc[:, 0]
         b = aligned.iloc[:, 1]
@@ -51,13 +47,17 @@ class RiskAnalyzer:
                 continue
             start = mask.idxmax()
             end = mask[::-1].idxmax()
-            dd_periods.append({
-                "start": start,
-                "end": end,
-                "duration": (end - start).days if hasattr(end - start, "days") else len(equity.loc[start:end]),
-                "max_drawdown": float(dd.loc[start:end].min()),
-                "recovery": float((equity.loc[end] / peak.loc[start]) - 1) if end else 0.0,
-            })
+            dd_periods.append(
+                {
+                    "start": start,
+                    "end": end,
+                    "duration": (end - start).days
+                    if hasattr(end - start, "days")
+                    else len(equity.loc[start:end]),
+                    "max_drawdown": float(dd.loc[start:end].min()),
+                    "recovery": float((equity.loc[end] / peak.loc[start]) - 1) if end else 0.0,
+                }
+            )
         return pd.DataFrame(dd_periods).sort_values("max_drawdown")
 
     @staticmethod
@@ -78,9 +78,7 @@ class RiskAnalyzer:
         return returns.corr()
 
     @staticmethod
-    def stress_test(
-        returns: pd.Series, scenarios: Dict[str, float] = None
-    ) -> pd.DataFrame:
+    def stress_test(returns: pd.Series, scenarios: dict[str, float] | None = None) -> pd.DataFrame:
         if scenarios is None:
             scenarios = {"-5% 下跌": -0.05, "-10% 下跌": -0.10, "-20% 暴跌": -0.20}
         results = []
@@ -88,10 +86,12 @@ class RiskAnalyzer:
         for name, shock in scenarios.items():
             shocked_ret = returns + shock
             final = current_value * (1 + shocked_ret).prod()
-            results.append({
-                "scenario": name,
-                "shock": shock,
-                "final_value": round(final, 2),
-                "total_return": round(float((1 + shocked_ret).prod() - 1), 4),
-            })
+            results.append(
+                {
+                    "scenario": name,
+                    "shock": shock,
+                    "final_value": round(final, 2),
+                    "total_return": round(float((1 + shocked_ret).prod() - 1), 4),
+                }
+            )
         return pd.DataFrame(results)

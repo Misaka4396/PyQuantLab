@@ -8,12 +8,12 @@
 审计返回 ``LeakageReport``（含 issues 列表），``audit_raise`` 在有泄漏时抛
 ``LeakageError``。配合 ``ml.features.build_labels`` 的 ``label_asof`` 列可追溯。
 """
+
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import List, Optional, Sequence
 
-import numpy as np
 import pandas as pd
 
 
@@ -25,16 +25,16 @@ class LeakageError(Exception):
 class LeakageIssue:
     """单条泄漏问题。"""
 
-    check: str          # 检测类型：label_leakage / future_price_leakage / correlation_leakage
-    feature: str        # 问题特征列
-    detail: str         # 说明（含被比对的对象与数值）
+    check: str  # 检测类型：label_leakage / future_price_leakage / correlation_leakage
+    feature: str  # 问题特征列
+    detail: str  # 说明（含被比对的对象与数值）
 
 
 @dataclass
 class LeakageReport:
     """泄漏审计报告。"""
 
-    issues: List[LeakageIssue] = field(default_factory=list)
+    issues: list[LeakageIssue] = field(default_factory=list)
 
     @property
     def has_leaks(self) -> bool:
@@ -43,7 +43,9 @@ class LeakageReport:
     def to_frame(self) -> pd.DataFrame:
         if not self.issues:
             return pd.DataFrame(columns=["check", "feature", "detail"])
-        return pd.DataFrame([{"check": i.check, "feature": i.feature, "detail": i.detail} for i in self.issues])
+        return pd.DataFrame(
+            [{"check": i.check, "feature": i.feature, "detail": i.detail} for i in self.issues]
+        )
 
 
 def _near_equal(a: pd.Series, b: pd.Series, tolerance: float) -> bool:
@@ -55,7 +57,7 @@ def _near_equal(a: pd.Series, b: pd.Series, tolerance: float) -> bool:
     return diff <= tolerance
 
 
-def _numeric_cols(df: pd.DataFrame, cols: Sequence[str]) -> List[str]:
+def _numeric_cols(df: pd.DataFrame, cols: Sequence[str]) -> list[str]:
     """过滤出数值列（排除 label_asof 等时间戳/非数值列）。"""
     return [c for c in cols if c in df.columns and pd.api.types.is_numeric_dtype(df[c])]
 
@@ -72,10 +74,10 @@ class LeakageAuditor:
         self,
         features: pd.DataFrame,
         labels: pd.DataFrame,
-        label_cols: Optional[Sequence[str]] = None,
-    ) -> List[LeakageIssue]:
+        label_cols: Sequence[str] | None = None,
+    ) -> list[LeakageIssue]:
         """检测特征列是否等于未来标签列（同一时点）。"""
-        issues: List[LeakageIssue] = []
+        issues: list[LeakageIssue] = []
         raw_cols = list(label_cols) if label_cols is not None else list(labels.columns)
         label_cols = _numeric_cols(labels, raw_cols)
         for lcol in label_cols:
@@ -85,10 +87,13 @@ class LeakageAuditor:
                 if fcol in labels.columns:  # 跳过标签自身
                     continue
                 if _near_equal(features[fcol], labels[lcol], self.value_tolerance):
-                    issues.append(LeakageIssue(
-                        "label_leakage", fcol,
-                        f"特征 {fcol} 与未来标签 {lcol} 近乎相等（max|diff|<={self.value_tolerance}）",
-                    ))
+                    issues.append(
+                        LeakageIssue(
+                            "label_leakage",
+                            fcol,
+                            f"特征 {fcol} 与未来标签 {lcol} 近乎相等（max|diff|<={self.value_tolerance}）",
+                        )
+                    )
         return issues
 
     def audit_future_price_leakage(
@@ -96,27 +101,30 @@ class LeakageAuditor:
         features: pd.DataFrame,
         close: pd.Series,
         horizons: Sequence[int] = (1, 5, 10),
-    ) -> List[LeakageIssue]:
+    ) -> list[LeakageIssue]:
         """检测特征列是否等于未来第 h 期价格 close_{t+h}。"""
-        issues: List[LeakageIssue] = []
+        issues: list[LeakageIssue] = []
         for h in horizons:
             future = close.shift(-h)
             for fcol in features.columns:
                 if _near_equal(features[fcol], future, self.value_tolerance):
-                    issues.append(LeakageIssue(
-                        "future_price_leakage", fcol,
-                        f"特征 {fcol} 等于未来第 {h} 期价格（close.shift(-{h})）",
-                    ))
+                    issues.append(
+                        LeakageIssue(
+                            "future_price_leakage",
+                            fcol,
+                            f"特征 {fcol} 等于未来第 {h} 期价格（close.shift(-{h})）",
+                        )
+                    )
         return issues
 
     def audit_correlation_leakage(
         self,
         features: pd.DataFrame,
         labels: pd.DataFrame,
-        label_cols: Optional[Sequence[str]] = None,
-    ) -> List[LeakageIssue]:
+        label_cols: Sequence[str] | None = None,
+    ) -> list[LeakageIssue]:
         """检测特征与未来标签的相关系数是否接近 ±1。"""
-        issues: List[LeakageIssue] = []
+        issues: list[LeakageIssue] = []
         raw_cols = list(label_cols) if label_cols is not None else list(labels.columns)
         label_cols = _numeric_cols(labels, raw_cols)
         for lcol in label_cols:
@@ -132,10 +140,13 @@ class LeakageAuditor:
                     continue
                 corr = a.corr(b)
                 if corr is not None and abs(corr) > self.corr_threshold:
-                    issues.append(LeakageIssue(
-                        "correlation_leakage", fcol,
-                        f"特征 {fcol} 与未来标签 {lcol} 相关系数 {corr:.6f} 超过阈值 {self.corr_threshold}",
-                    ))
+                    issues.append(
+                        LeakageIssue(
+                            "correlation_leakage",
+                            fcol,
+                            f"特征 {fcol} 与未来标签 {lcol} 相关系数 {corr:.6f} 超过阈值 {self.corr_threshold}",
+                        )
+                    )
         return issues
 
     # ------------------------------------------------------------------
@@ -143,12 +154,12 @@ class LeakageAuditor:
         self,
         features: pd.DataFrame,
         labels: pd.DataFrame,
-        close: Optional[pd.Series] = None,
+        close: pd.Series | None = None,
         horizons: Sequence[int] = (1, 5, 10),
-        label_cols: Optional[Sequence[str]] = None,
+        label_cols: Sequence[str] | None = None,
     ) -> LeakageReport:
         """执行全部泄漏检测，返回报告。"""
-        issues: List[LeakageIssue] = []
+        issues: list[LeakageIssue] = []
         issues += self.audit_label_leakage(features, labels, label_cols)
         if close is not None:
             issues += self.audit_future_price_leakage(features, close, horizons)
@@ -159,9 +170,9 @@ class LeakageAuditor:
         self,
         features: pd.DataFrame,
         labels: pd.DataFrame,
-        close: Optional[pd.Series] = None,
+        close: pd.Series | None = None,
         horizons: Sequence[int] = (1, 5, 10),
-        label_cols: Optional[Sequence[str]] = None,
+        label_cols: Sequence[str] | None = None,
     ) -> LeakageReport:
         """审计并在发现泄漏时抛 LeakageError。"""
         report = self.audit(features, labels, close, horizons, label_cols)
@@ -173,7 +184,7 @@ class LeakageAuditor:
 
 __all__ = [
     "LeakageAuditor",
-    "LeakageReport",
-    "LeakageIssue",
     "LeakageError",
+    "LeakageIssue",
+    "LeakageReport",
 ]

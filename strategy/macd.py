@@ -22,16 +22,31 @@ class MACDStrategy(BaseStrategy):
     def get_param_spec(cls) -> dict:
         return {
             "fast": {
-                "type": "int", "default": 12, "min": 2, "max": 50, "step": 1,
-                "label": "快线周期", "help": "快速 EMA 周期",
+                "type": "int",
+                "default": 12,
+                "min": 2,
+                "max": 50,
+                "step": 1,
+                "label": "快线周期",
+                "help": "快速 EMA 周期",
             },
             "slow": {
-                "type": "int", "default": 26, "min": 5, "max": 100, "step": 1,
-                "label": "慢线周期", "help": "慢速 EMA 周期",
+                "type": "int",
+                "default": 26,
+                "min": 5,
+                "max": 100,
+                "step": 1,
+                "label": "慢线周期",
+                "help": "慢速 EMA 周期",
             },
             "signal": {
-                "type": "int", "default": 9, "min": 2, "max": 30, "step": 1,
-                "label": "信号线周期", "help": "信号线 EMA 周期",
+                "type": "int",
+                "default": 9,
+                "min": 2,
+                "max": 30,
+                "step": 1,
+                "label": "信号线周期",
+                "help": "信号线 EMA 周期",
             },
         }
 

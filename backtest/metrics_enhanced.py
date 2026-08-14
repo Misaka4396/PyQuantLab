@@ -33,10 +33,10 @@
 
 与 C4 联动：``compare_is_oos`` 接收 IS/OOS 两组权益序列做对比（过拟合检测的输入）。
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Sequence, Union
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
@@ -78,16 +78,16 @@ class RoundTrip:
     quantity: float
     entry_price: float
     exit_price: float
-    pnl: float          # 已扣双边费用的净盈亏
-    pnl_pct: float      # pnl / 建仓成本
+    pnl: float  # 已扣双边费用的净盈亏
+    pnl_pct: float  # pnl / 建仓成本
     win: bool
     holding_bars: int
 
 
 def build_round_trips(
     fills: pd.DataFrame,
-    equity_index: Optional[pd.DatetimeIndex] = None,
-) -> List[RoundTrip]:
+    equity_index: pd.DatetimeIndex | None = None,
+) -> list[RoundTrip]:
     """按 symbol 分组、FIFO 配对平仓，返回逐笔交易列表。
 
     费用分摊：买入单位成本 = exec_price + 买入费/买入量；卖出单位收入 = exec_price - 卖出费/卖出量。
@@ -102,14 +102,14 @@ def build_round_trips(
         if c not in df.columns:
             raise ValueError(f"成交明细缺少列: {c}")
 
-    pos_map: Dict[pd.Timestamp, int] = {}
+    pos_map: dict[pd.Timestamp, int] = {}
     if equity_index is not None:
         pos_map = {ts: i for i, ts in enumerate(pd.DatetimeIndex(equity_index))}
 
-    trips: List[RoundTrip] = []
+    trips: list[RoundTrip] = []
     for symbol, grp in df.groupby("symbol"):
         grp = grp.sort_values("timestamp")
-        open_lots: List[dict] = []  # FIFO 队列：{qty, cost_per_share, entry_time}
+        open_lots: list[dict] = []  # FIFO 队列：{qty, cost_per_share, entry_time}
         for _, row in grp.iterrows():
             side = str(row["side"]).upper()
             qty = float(row["quantity"])
@@ -120,7 +120,9 @@ def build_round_trips(
                 continue
             if side == BUY:
                 cost_per_share = exec_price + fee / qty
-                open_lots.append({"qty": qty, "cost": cost_per_share, "entry": ts, "entry_price": exec_price})
+                open_lots.append(
+                    {"qty": qty, "cost": cost_per_share, "entry": ts, "entry_price": exec_price}
+                )
             elif side == SELL:
                 proceeds_per_share = exec_price - fee / qty
                 remaining = qty
@@ -136,18 +138,20 @@ def build_round_trips(
                         xi = pos_map.get(ts)
                         if ei is not None and xi is not None:
                             hb = max(1, xi - ei)
-                    trips.append(RoundTrip(
-                        symbol=symbol,
-                        entry_time=lot["entry"],
-                        exit_time=ts,
-                        quantity=matched,
-                        entry_price=lot["entry_price"],
-                        exit_price=exec_price,
-                        pnl=float(pnl),
-                        pnl_pct=float(pnl_pct),
-                        win=pnl > 0,
-                        holding_bars=hb,
-                    ))
+                    trips.append(
+                        RoundTrip(
+                            symbol=symbol,
+                            entry_time=lot["entry"],
+                            exit_time=ts,
+                            quantity=matched,
+                            entry_price=lot["entry_price"],
+                            exit_price=exec_price,
+                            pnl=float(pnl),
+                            pnl_pct=float(pnl_pct),
+                            win=pnl > 0,
+                            holding_bars=hb,
+                        )
+                    )
                     lot["qty"] -= matched
                     remaining -= matched
                     if lot["qty"] <= 1e-12:
@@ -164,7 +168,7 @@ class PerformanceAnalyzer:
     def __init__(
         self,
         equity_curve: pd.DataFrame,
-        fills: Optional[pd.DataFrame] = None,
+        fills: pd.DataFrame | None = None,
         periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
         risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
     ):
@@ -174,7 +178,7 @@ class PerformanceAnalyzer:
         self.fills = fills if fills is not None else pd.DataFrame()
         self.periods_per_year = int(periods_per_year)
         self.risk_free_rate = float(risk_free_rate)
-        self._trips: Optional[List[RoundTrip]] = None
+        self._trips: list[RoundTrip] | None = None
 
     # ------------------------------ 收益 ------------------------------
     def cumulative_return(self) -> float:
@@ -281,7 +285,7 @@ class PerformanceAnalyzer:
         return var, cvar
 
     # ------------------------------ 交易 ------------------------------
-    def round_trips(self) -> List[RoundTrip]:
+    def round_trips(self) -> list[RoundTrip]:
         """返回 FIFO 配对后的平仓交易列表（懒加载缓存）。"""
         if self._trips is None:
             self._trips = build_round_trips(self.fills, self.equity.index)
@@ -298,10 +302,16 @@ class PerformanceAnalyzer:
         gross_loss = abs(sum(t.pnl for t in losses))
 
         win_rate = n_wins / total if total else 0.0
-        profit_factor = gross_profit / gross_loss if gross_loss > 0 else (float("inf") if gross_profit > 0 else 0.0)
+        profit_factor = (
+            gross_profit / gross_loss
+            if gross_loss > 0
+            else (float("inf") if gross_profit > 0 else 0.0)
+        )
         avg_win = gross_profit / n_wins if n_wins else 0.0
         avg_loss = -gross_loss / n_losses if n_losses else 0.0
-        avg_win_loss_ratio = avg_win / abs(avg_loss) if avg_loss != 0 else (float("inf") if avg_win > 0 else 0.0)
+        avg_win_loss_ratio = (
+            avg_win / abs(avg_loss) if avg_loss != 0 else (float("inf") if avg_win > 0 else 0.0)
+        )
         avg_holding = float(np.mean([t.holding_bars for t in trips])) if total else 0.0
 
         # 换手率 / 成本占比（基于成交额口径）
@@ -346,12 +356,14 @@ class PerformanceAnalyzer:
         rows = []
         for symbol in sorted({t.symbol for t in trips}):
             st = [t for t in trips if t.symbol == symbol]
-            rows.append({
-                "symbol": symbol,
-                "trades": len(st),
-                "realized_pnl": float(sum(t.pnl for t in st)),
-                "win_rate": sum(1 for t in st if t.win) / len(st),
-            })
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "trades": len(st),
+                    "realized_pnl": float(sum(t.pnl for t in st)),
+                    "win_rate": sum(1 for t in st if t.win) / len(st),
+                }
+            )
         return pd.DataFrame(rows, columns=["symbol", "trades", "realized_pnl", "win_rate"])
 
     # ------------------------------ 汇总 ------------------------------
@@ -364,7 +376,7 @@ class PerformanceAnalyzer:
         return {
             "start": start,
             "end": end,
-            "n_periods": int(len(self.returns)),
+            "n_periods": len(self.returns),
             "total_return": self.cumulative_return(),
             "annualized_return": self.annualized_return(),
             "annualized_volatility": self.annualized_volatility(),
@@ -396,8 +408,8 @@ def _finite(x: float, cap: float) -> float:
 # 与 C4 联动：IS/OOS 两组权益序列对比（过拟合检测输入）
 # ---------------------------------------------------------------------------
 def compare_is_oos(
-    is_equity: Union[pd.Series, pd.DataFrame],
-    oos_equity: Union[pd.Series, pd.DataFrame],
+    is_equity: pd.Series | pd.DataFrame,
+    oos_equity: pd.Series | pd.DataFrame,
     periods_per_year: int = DEFAULT_PERIODS_PER_YEAR,
     risk_free_rate: float = DEFAULT_RISK_FREE_RATE,
 ) -> dict:
@@ -408,13 +420,18 @@ def compare_is_oos(
     - sharpe_degradation = OOS Sharpe / IS Sharpe（<1 说明样本外衰减）
     - return_degradation = OOS 年化收益 / IS 年化收益
     """
+
     def _curve(x) -> pd.DataFrame:
         if isinstance(x, pd.DataFrame):
             return x
         return pd.DataFrame({"equity": pd.Series(x)})
 
-    is_a = PerformanceAnalyzer(_curve(is_equity), periods_per_year=periods_per_year, risk_free_rate=risk_free_rate)
-    oos_a = PerformanceAnalyzer(_curve(oos_equity), periods_per_year=periods_per_year, risk_free_rate=risk_free_rate)
+    is_a = PerformanceAnalyzer(
+        _curve(is_equity), periods_per_year=periods_per_year, risk_free_rate=risk_free_rate
+    )
+    oos_a = PerformanceAnalyzer(
+        _curve(oos_equity), periods_per_year=periods_per_year, risk_free_rate=risk_free_rate
+    )
 
     is_sharpe = is_a.sharpe_ratio()
     oos_sharpe = oos_a.sharpe_ratio()
@@ -433,10 +450,10 @@ def compare_is_oos(
 
 
 __all__ = [
+    "DEFAULT_PERIODS_PER_YEAR",
+    "DEFAULT_RISK_FREE_RATE",
     "PerformanceAnalyzer",
     "RoundTrip",
     "build_round_trips",
     "compare_is_oos",
-    "DEFAULT_PERIODS_PER_YEAR",
-    "DEFAULT_RISK_FREE_RATE",
 ]

@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 
 
@@ -22,8 +23,8 @@ class BacktestConfig:
     initial_capital: float = 100_000.0
     commission: float = 0.001
     slippage: float = 0.0005
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
+    start_date: str | None = None
+    end_date: str | None = None
 
 
 @dataclass

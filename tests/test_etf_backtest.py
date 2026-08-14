@@ -6,6 +6,7 @@
 - 容量分析输出容量上限估算；压力测试输出最大敞口
 - 报告含折溢价机会频率/幅度统计
 """
+
 from __future__ import annotations
 
 import json
@@ -16,11 +17,10 @@ import pytest
 
 from etf.basket_execution import BasketExecutor
 from etf.etf_backtest import (
-    run_dual_mode,
-    capacity_analysis,
-    stress_test,
-    premium_opportunity_stats,
     generate_report,
+    premium_opportunity_stats,
+    run_dual_mode,
+    stress_test,
 )
 from etf.execution_config import ExecutionConfig
 from etf.threshold_config import ThresholdConfig
@@ -33,9 +33,7 @@ def _synthetic_data(n_days: int = 4, seed: int = 1, base: float = 3.0):
     days = pd.bdate_range("2024-01-02", periods=n_days)
     idx_parts = []
     for d in days:
-        r = pd.date_range(
-            d.replace(hour=9, minute=30), d.replace(hour=15, minute=0), freq="1min"
-        )
+        r = pd.date_range(d.replace(hour=9, minute=30), d.replace(hour=15, minute=0), freq="1min")
         mask = (r.hour >= 9) & (r.hour <= 15)
         mask &= ~((r.hour == 11) & (r.minute > 30))
         mask &= r.hour != 12
@@ -50,29 +48,43 @@ def _synthetic_data(n_days: int = 4, seed: int = 1, base: float = 3.0):
     low = np.minimum(open_, close) * 0.9999
     volume = np.full(len(idx), 1_000_000.0)
     amount = volume * close
-    quotes = pd.DataFrame({
-        "open": open_, "high": high, "low": low,
-        "close": close, "volume": volume, "amount": amount,
-    }, index=idx)
+    quotes = pd.DataFrame(
+        {
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "volume": volume,
+            "amount": amount,
+        },
+        index=idx,
+    )
     quotes.index.name = "datetime"
     return quotes, premium
 
 
 def _cfg() -> ThresholdConfig:
     return ThresholdConfig(
-        use_quantile=False, zscore_window=20, zscore_entry=0.5, entry_buffer=0.0,
-        stop_loss_bp=30.0, zscore_exit=0.0, min_holding_minutes=5,
+        use_quantile=False,
+        zscore_window=20,
+        zscore_entry=0.5,
+        entry_buffer=0.0,
+        stop_loss_bp=30.0,
+        zscore_exit=0.0,
+        min_holding_minutes=5,
         force_close_time="14:45",
     )
 
 
 def _sync_executor(seed: int = 42) -> BasketExecutor:
-    return BasketExecutor(ExecutionConfig(
-        partial_fill_prob=0.5,
-        partial_fill_ratio_min=0.4,
-        partial_fill_ratio_max=0.8,
-        seed=seed,
-    ))
+    return BasketExecutor(
+        ExecutionConfig(
+            partial_fill_prob=0.5,
+            partial_fill_ratio_min=0.4,
+            partial_fill_ratio_max=0.8,
+            seed=seed,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -81,8 +93,13 @@ def _sync_executor(seed: int = 42) -> BasketExecutor:
 def test_dual_mode_two_equity_curves_exist_and_differ():
     quotes, premium = _synthetic_data()
     result = run_dual_mode(
-        quotes, premium, "510300", etf_quantity=100_000.0,
-        threshold_config=_cfg(), unit_cost_rate=0.0, seed=42,
+        quotes,
+        premium,
+        "510300",
+        etf_quantity=100_000.0,
+        threshold_config=_cfg(),
+        unit_cost_rate=0.0,
+        seed=42,
         executor=_sync_executor(42),
     )
 
@@ -107,8 +124,13 @@ def test_net_of_cost_reproducible_same_seed():
 
     def run_once():
         return run_dual_mode(
-            quotes, premium, "510300", etf_quantity=100_000.0,
-            threshold_config=_cfg(), unit_cost_rate=0.0, seed=42,
+            quotes,
+            premium,
+            "510300",
+            etf_quantity=100_000.0,
+            threshold_config=_cfg(),
+            unit_cost_rate=0.0,
+            seed=42,
             executor=_sync_executor(42),
         )
 
@@ -119,9 +141,7 @@ def test_net_of_cost_reproducible_same_seed():
     assert r1.sync_risk_metrics["total_return"] == pytest.approx(
         r2.sync_risk_metrics["total_return"]
     )
-    assert r1.ideal_metrics["total_return"] == pytest.approx(
-        r2.ideal_metrics["total_return"]
-    )
+    assert r1.ideal_metrics["total_return"] == pytest.approx(r2.ideal_metrics["total_return"])
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +150,13 @@ def test_net_of_cost_reproducible_same_seed():
 def test_capacity_analysis_outputs_upper_bound():
     quotes, premium = _synthetic_data()
     result = run_dual_mode(
-        quotes, premium, "510300", etf_quantity=100_000.0,
-        threshold_config=_cfg(), unit_cost_rate=0.0, seed=42,
+        quotes,
+        premium,
+        "510300",
+        etf_quantity=100_000.0,
+        threshold_config=_cfg(),
+        unit_cost_rate=0.0,
+        seed=42,
         executor=_sync_executor(42),
     )
     cap = result.capacity
@@ -163,8 +188,12 @@ def test_stress_test_outputs_max_exposure():
 def test_premium_opportunity_stats_frequency_amplitude():
     quotes, premium = _synthetic_data()
     stats = premium_opportunity_stats(premium, threshold=0.001)
-    for key in ("n_opportunities", "opportunity_frequency",
-                "mean_opportunity_amplitude", "max_opportunity_amplitude"):
+    for key in (
+        "n_opportunities",
+        "opportunity_frequency",
+        "mean_opportunity_amplitude",
+        "max_opportunity_amplitude",
+    ):
         assert key in stats
     assert 0.0 <= stats["opportunity_frequency"] <= 1.0
     assert stats["n_opportunities"] > 0
@@ -174,11 +203,16 @@ def test_premium_opportunity_stats_frequency_amplitude():
 def test_report_contains_premium_stats(tmp_path):
     quotes, premium = _synthetic_data()
     result = run_dual_mode(
-        quotes, premium, "510300", etf_quantity=100_000.0,
-        threshold_config=_cfg(), unit_cost_rate=0.0, seed=42,
+        quotes,
+        premium,
+        "510300",
+        etf_quantity=100_000.0,
+        threshold_config=_cfg(),
+        unit_cost_rate=0.0,
+        seed=42,
         executor=_sync_executor(42),
     )
-    paths = generate_report(result, tmp_path)
+    generate_report(result, tmp_path)
     summary = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))
     assert "premium_stats" in summary
     assert "capacity" in summary

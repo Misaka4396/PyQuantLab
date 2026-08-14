@@ -1,24 +1,23 @@
 """Strategy plugin registry for dynamic strategy discovery."""
 
 from __future__ import annotations
-from typing import Dict, List
 
 from strategy.base import BaseStrategy
 
 
 class StrategyRegistry:
     def __init__(self):
-        self._strategies: Dict[str, type[BaseStrategy]] = {}
+        self._strategies: dict[str, type[BaseStrategy]] = {}
 
     def register(self, strategy_cls: type[BaseStrategy]) -> None:
         name = strategy_cls.get_name()
         self._strategies[name] = strategy_cls
 
     def register_defaults(self) -> None:
-        from strategy.ma_crossover import MACrossoverStrategy
-        from strategy.rsi import RSIStrategy
-        from strategy.macd import MACDStrategy
         from strategy.bollinger import BollingerStrategy
+        from strategy.ma_crossover import MACrossoverStrategy
+        from strategy.macd import MACDStrategy
+        from strategy.rsi import RSIStrategy
 
         self.register(MACrossoverStrategy)
         self.register(RSIStrategy)
@@ -38,10 +37,10 @@ class StrategyRegistry:
             merged[key] = params.get(key, info["default"])
         return cls(merged)
 
-    def list_all(self) -> List[type[BaseStrategy]]:
+    def list_all(self) -> list[type[BaseStrategy]]:
         return list(self._strategies.values())
 
-    def list_names(self) -> List[str]:
+    def list_names(self) -> list[str]:
         return list(self._strategies.keys())
 
     def get_param_spec(self, name: str) -> dict:

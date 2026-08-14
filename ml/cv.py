@@ -9,9 +9,8 @@
 单位约定：``purge_horizon`` 与 ``embargo`` 均以 **bar 数**（观测数）计，便于与
 手工实现对照；若需按时间长度 purge，可先把时间戳重采样为等间隔再调用。
 """
-from __future__ import annotations
 
-from typing import List, Sequence, Tuple, Union
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -25,7 +24,9 @@ def as_sorted_index(times) -> pd.DatetimeIndex:
     return idx
 
 
-def _excluded_mask(pos: np.ndarray, v0: int, v1: int, purge_horizon: int, embargo: int) -> np.ndarray:
+def _excluded_mask(
+    pos: np.ndarray, v0: int, v1: int, purge_horizon: int, embargo: int
+) -> np.ndarray:
     """返回位置数组 pos 中应被剔除的布尔掩码（True=剔除）。
 
     剔除区间 = [v0 - purge_horizon, v1 + embargo]：
@@ -40,7 +41,7 @@ def purged_kfold(
     n_splits: int = 5,
     embargo: int = 0,
     purge_horizon: int = 0,
-) -> List[Tuple[np.ndarray, np.ndarray]]:
+) -> list[tuple[np.ndarray, np.ndarray]]:
     """Purged K-fold 切分。
 
     参数：
@@ -61,7 +62,7 @@ def purged_kfold(
         raise ValueError("embargo / purge_horizon 不能为负")
 
     fold_bounds = np.array_split(np.arange(n), n_splits)
-    splits: List[Tuple[np.ndarray, np.ndarray]] = []
+    splits: list[tuple[np.ndarray, np.ndarray]] = []
     for fold in fold_bounds:
         v0, v1 = int(fold[0]), int(fold[-1])
         pos = np.arange(n)
@@ -82,4 +83,4 @@ def fold_table(times, splits) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["fold", "role", "position", "timestamp"])
 
 
-__all__ = ["purged_kfold", "fold_table", "as_sorted_index"]
+__all__ = ["as_sorted_index", "fold_table", "purged_kfold"]

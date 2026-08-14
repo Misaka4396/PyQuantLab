@@ -1,12 +1,10 @@
 """组合模拟页面 — 组合优化与蒙特卡洛模拟."""
 
-import numpy as np
 import pandas as pd
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QComboBox,
-    QDoubleSpinBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -155,10 +153,11 @@ class PortfolioPage(QWidget):
 
     def on_activated(self):
         from PyQt5.QtWidgets import QApplication
+
         for w in QApplication.instance().allWidgets():
-            if hasattr(w, 'nav_list'):
+            if hasattr(w, "nav_list"):
                 dp = w.pages[1]
-                if hasattr(dp, 'data') and dp.data is not None:
+                if hasattr(dp, "data") and dp.data is not None:
                     data = dp.data
                     if isinstance(data.columns, pd.MultiIndex):
                         tickers = list(data.columns.levels[0])
@@ -190,7 +189,8 @@ class PortfolioPage(QWidget):
             return pw, frontier
 
         self._opt_thread = run_in_thread(
-            self, _compute,
+            self,
+            _compute,
             on_finished=self._on_opt_done,
             on_error=lambda e: self._set_opt_enabled(True),
         )
@@ -202,17 +202,17 @@ class PortfolioPage(QWidget):
         self.weights_table.setRowCount(len(pw.assets))
         self.weights_table.setColumnCount(2)
         self.weights_table.setHorizontalHeaderLabels(["资产", "权重"])
-        for row, (asset, wgt) in enumerate(zip(pw.assets, pw.weights)):
+        for row, (asset, wgt) in enumerate(zip(pw.assets, pw.weights, strict=False)):
             item0 = QTableWidgetItem(asset)
             item0.setFont(QFont(FONT_FAMILY, 13))
             self.weights_table.setItem(row, 0, item0)
-            item1 = QTableWidgetItem(f"{wgt*100:.1f}%")
+            item1 = QTableWidgetItem(f"{wgt * 100:.1f}%")
             item1.setTextAlignment(Qt.AlignCenter)
             item1.setFont(QFont(FONT_FAMILY, 13))
             self.weights_table.setItem(row, 1, item1)
 
-        self.opt_metrics["预期收益"].setText(f"{pw.expected_return*100:.2f}%")
-        self.opt_metrics["预期波动率"].setText(f"{pw.expected_volatility*100:.2f}%")
+        self.opt_metrics["预期收益"].setText(f"{pw.expected_return * 100:.2f}%")
+        self.opt_metrics["预期波动率"].setText(f"{pw.expected_volatility * 100:.2f}%")
         self.opt_metrics["夏普比率"].setText(f"{pw.sharpe_ratio:.2f}")
 
         while self.frontier_layout.count():
@@ -249,7 +249,8 @@ class PortfolioPage(QWidget):
             return percentiles, stats
 
         self._mc_thread = run_in_thread(
-            self, _compute,
+            self,
+            _compute,
             on_finished=self._on_mc_done,
             on_error=lambda e: self._set_mc_enabled(True),
         )
@@ -264,7 +265,12 @@ class PortfolioPage(QWidget):
         canvas = monte_carlo_chart(percentiles)
         self.mc_chart_layout.addWidget(canvas)
 
-        for name, key in [("均值", "mean"), ("中位数", "median"), ("P5 下限", "p5"), ("P95 上限", "p95")]:
+        for name, key in [
+            ("均值", "mean"),
+            ("中位数", "median"),
+            ("P5 下限", "p5"),
+            ("P95 上限", "p95"),
+        ]:
             val = stats.get(key, 0)
             self.mc_stats[name].setText(f"${val:,.0f}")
 
