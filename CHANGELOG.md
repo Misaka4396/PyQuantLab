@@ -4,6 +4,11 @@
 
 ## [v1.2.6] - 2026-08-13
 
+### 变更：exe 重打（v1.2.6 修复后源码）
+
+- 主程序与 ML 训练器用 ruff 修复/现代化后的源码重新打包（lint 修复不改变功能语义，164 测试全绿为证）
+- 产物：主程序 exe 199MB + ML exe 271MB + 共享 common（23 mkl，406MB）；启动/registry/overfit/train 全链路 7/7 验证通过
+
 ### 新增：API 文档生成（P4）
 
 - 新增 `docs/api/`：pdoc 生成的 API 文档（51 个 HTML 页面，覆盖 engine/etf/ml/data/backtest/cost_model/cost_config/core）
