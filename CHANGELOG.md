@@ -2,6 +2,15 @@
 
 本项目使用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式。
 
+## [v1.2.4] - 2026-08-13
+
+### 新增：集成测试分层（P1-2）
+
+- 新增 `tests/integration/` 目录，跨模块全链路集成测试（8 用例，合成数据 + 固定种子，离线确定性）
+- `test_etf_arbitrage_pipeline.py`（B 链 4 用例）：A1 数据 → B1 折溢价 → B2 信号（机会窗口驱动开/平仓 + 前视防护）→ B3 篮子执行（A3 计费口径一致）→ B4 双模式回测（容量/压力/机会统计）
+- `test_ml_pipeline.py`（C 链 4 用例）：C1 特征-标签对齐（t→t+h 可追溯）→ C2 Purged K-fold + Walk-forward 无泄漏 → C3 LightGBM 训练版本化 → C4 过拟合判定 + 报告落盘
+- 全量回归：**154 测试通过**（146 单元 + 8 集成），覆盖率 84.70%
+
 ## [v1.2.3] - 2026-08-13
 
 ### 新增：开源治理（P1-1）
