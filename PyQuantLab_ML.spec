@@ -49,7 +49,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[os.path.join(PROJECT_DIR, 'runtime_hook_common.py')],
     excludes=[
         # GUI 与 Web 全部排除（本产物为纯 CLI）
         'PyQt5',
@@ -92,6 +92,9 @@ a = Analysis(
     ],
     noarchive=False,
 )
+
+# ---- 方案 A 共享 DLL：mkl 全套移出 exe 目录，运行时从 dist/PyQuantLab_common/ 加载 ----
+a.binaries = [b for b in a.binaries if not (b[0].startswith("mkl_") and b[0].endswith(".dll"))]
 
 pyz = PYZ(a.pure)
 

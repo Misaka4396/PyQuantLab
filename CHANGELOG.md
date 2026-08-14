@@ -2,6 +2,17 @@
 
 本项目使用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式。
 
+## [v1.2.2] - 2026-08-13
+
+### 变更：共享 DLL 目录（方案 A）
+
+- 新增 `dist/PyQuantLab_common/`：mkl 数学库（23 个 DLL，406MB）从两个 exe 移出，主程序与 ML 训练器**共享**同一份
+- 新增 `runtime_hook_common.py`：exe 启动时经 `os.add_dll_directory` 加载共享目录，numpy/scipy 运行不受影响
+- 新增 `scripts/build_common.ps1`：一键构建共享目录（从打包产物复制 mkl DLL）
+- 体积：主程序 exe **347MB → 199MB**（-43%），ML 训练器 **419MB → 271MB**（-35%）
+- 发布结构：`dist/PyQuantLab/` + `dist/PyQuantLab_ML/` + `dist/PyQuantLab_common/`（三者缺一不可）
+- 验证：主程序 GUI 启动正常；ML 训练器 registry/overfit/train 全链路实测通过（mkl 自 common 加载）
+
 ## [v1.2.1] - 2026-08-13
 
 ### 变更：exe 发布拆分（方案 B）
