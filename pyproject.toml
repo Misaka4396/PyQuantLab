@@ -1,9 +1,19 @@
 [project]
 name = "PyQuantLab"
-version = "1.2.2"
+version = "1.2.5"
 description = "Python 量化交易平台：回测数据治理 / 事件驱动引擎 / ETF 套利 / ML-DL 建模"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+
+# ---------------------------------------------------------------------------
+# commitizen：Conventional Commits 提交规范强制（P2）
+# ---------------------------------------------------------------------------
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "1.2.5"
+tag_format = "v$version"
+version_files = ["pyproject.toml", "CHANGELOG.md"]
+update_changelog_on_bump = true
 
 # ---------------------------------------------------------------------------
 # ruff：lint + format（P3 规范落地）

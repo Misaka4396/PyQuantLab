@@ -20,3 +20,10 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=2048"]
       - id: check-merge-conflict
+
+  # commitizen: 提交信息 Conventional Commits 校验（P2）
+  - repo: ssh://git@ssh.github.com:443/commitizen-tools/commitizen.git
+    rev: v4.17.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
