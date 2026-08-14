@@ -116,7 +116,7 @@ def _mse(y, yp):
 
 
 def test_walk_forward_split_no_overlap_and_retrain_schedule():
-    idx, X, y = _linear_data(30)
+    idx, _X, _y = _linear_data(30)
     wf = WalkForward(n_train=10, n_test=5, step=5, retrain_every=2, embargo=1, purge_horizon=1)
     splits = wf.split(idx)
     assert len(splits) > 0

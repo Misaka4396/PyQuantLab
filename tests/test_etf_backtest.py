@@ -186,7 +186,7 @@ def test_stress_test_outputs_max_exposure():
 # 折溢价机会统计 + 报告联动
 # ---------------------------------------------------------------------------
 def test_premium_opportunity_stats_frequency_amplitude():
-    quotes, premium = _synthetic_data()
+    _quotes, premium = _synthetic_data()
     stats = premium_opportunity_stats(premium, threshold=0.001)
     for key in (
         "n_opportunities",

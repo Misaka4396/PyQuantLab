@@ -93,7 +93,7 @@ def test_torch_dataset_time_windows_no_future():
 
 def test_train_val_split_by_time_contiguous():
     X, y = _synthetic(100)
-    Xtr, ytr, Xva, yva = train_val_split_by_time(X, y, train_frac=0.8)
+    Xtr, _ytr, Xva, _yva = train_val_split_by_time(X, y, train_frac=0.8)
     assert len(Xtr) + len(Xva) == 100
     # 训练在前、验证在后（时间顺序，无随机、无重叠）
     Xf = X.astype(np.float32)
