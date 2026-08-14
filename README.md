@@ -95,6 +95,7 @@ pyinstaller PyQuantLab_Qt.spec --noconfirm
 from strategy.base import BaseStrategy
 import pandas as pd
 
+
 class MyStrategy(BaseStrategy):
     @classmethod
     def get_name(cls) -> str:
@@ -102,8 +103,17 @@ class MyStrategy(BaseStrategy):
 
     @classmethod
     def get_param_spec(cls) -> dict:
-        return {"param1": {"type": "int", "default": 10, "min": 1, "max": 100,
-                           "step": 1, "label": "参数1", "help": "说明"}}
+        return {
+            "param1": {
+                "type": "int",
+                "default": 10,
+                "min": 1,
+                "max": 100,
+                "step": 1,
+                "label": "参数1",
+                "help": "说明",
+            }
+        }
 
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
         # 返回: 1(买) / -1(卖) / 0(持有)
@@ -114,6 +124,7 @@ class MyStrategy(BaseStrategy):
 
 ```python
 from strategy.my_strategy import MyStrategy
+
 registry.register(MyStrategy)
 ```
 
