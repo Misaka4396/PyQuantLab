@@ -4,6 +4,12 @@
 
 ## [v1.2.6] - 2026-08-13
 
+### 新增：API 文档生成（P4）
+
+- 新增 `docs/api/`：pdoc 生成的 API 文档（51 个 HTML 页面，覆盖 engine/etf/ml/data/backtest/cost_model/cost_config/core）
+- 新增 `scripts/build_docs.ps1`：一键重新生成文档
+- README 增加「API 文档」章节
+
 ### 新增：CR 流程规范（P5）
 
 - 新增 `.github/CODE_REVIEW.md`：CR 流程时序（发起→指派→审查→修改→合并，含 SLA）、六维审查清单（正确性/安全/性能/可读性/测试/规范）、评论三级（blocker/建议/nit）、合并策略（approve/CI 绿/squash/回滚）、度量指标（响应 ≤24h、revert <2%）、小改动快速通道（<100 行）

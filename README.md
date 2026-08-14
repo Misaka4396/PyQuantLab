@@ -156,6 +156,10 @@ PyQuantLab/
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
 
+## API 文档
+
+[在线 API 文档](docs/api/index.html)（pdoc 生成：`powershell -File scripts/build_docs.ps1`）。
+
 ## 贡献
 
 欢迎贡献！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)（开发环境 / 代码规范 / 测试 / 提交规范 / PR 流程），并遵守 [行为准则](CODE_OF_CONDUCT.md)。
