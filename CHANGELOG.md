@@ -4,6 +4,14 @@
 
 ## [v1.2.3] - 2026-08-13
 
+### 新增：开源治理（P1-1）
+
+- 新增 `CONTRIBUTING.md`：开发环境 / 代码规范 / 测试要求 / Conventional Commits 提交规范 / trunk-based 分支与 PR 流程
+- 新增 Issue 模板：`.github/ISSUE_TEMPLATE/bug_report.md`、`feature_request.md`
+- 新增 `.github/PULL_REQUEST_TEMPLATE.md`：PR 检查清单（类型/关联 Issue/验证项）
+- 新增 `CODE_OF_CONDUCT.md`：贡献者公约行为准则（中文版）
+- README 增加「贡献」章节（链接 CONTRIBUTING/行为准则）
+
 ### 新增：工程化工具链（P0：ruff + pre-commit + CI）
 
 - 新增 `pyproject.toml`：ruff（lint+format，line-length 100，中文项目忽略 RUF001/2/3）、mypy（宽松）、pytest、coverage 门禁（fail_under=80，范围限定 A/B/C 新专项）
