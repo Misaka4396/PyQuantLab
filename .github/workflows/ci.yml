@@ -44,11 +44,16 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      - name: Install Qt runtime deps (GUI 冒烟测试 offscreen 需要)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libdbus-1-3
+
       - name: Install torch (CPU, 官方源)
         run: pip install torch --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pytest pytest-cov
+        run: pip install -r requirements.txt pytest pytest-cov pytest-qt
 
       - name: Run tests with coverage gate
         run: pytest tests/ --cov --cov-report=term-missing

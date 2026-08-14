@@ -2,6 +2,16 @@
 
 本项目使用 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 格式。
 
+## [v1.2.5] - 2026-08-13
+
+### 新增：E2E GUI 冒烟测试（P10）
+
+- 新增 `tests/e2e/` 分层：pytest-qt + `QT_QPA_PLATFORM=offscreen` 无头 GUI 测试（10 用例）
+- 覆盖：主窗口构造（标题/6 页面/侧边栏/状态栏）、逐页导航切换（on_activated 不崩溃）、回测页核心控件
+- `pyproject.toml` 强制 `qt_api = "pyqt5"`（环境多 Qt 绑定防冲突）
+- CI 增加 Qt 无头运行依赖（libegl1/libgl1/libxkbcommon0）；`requirements-dev.txt` 增 pytest-qt
+- 全量回归：**164 测试通过**（146 单元 + 8 集成 + 10 E2E）
+
 ## [v1.2.4] - 2026-08-13
 
 ### 新增：集成测试分层（P1-2）

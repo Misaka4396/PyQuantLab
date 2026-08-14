@@ -60,6 +60,7 @@ exclude = ["dist/", "build/", "data_cache/"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --tb=short"
+qt_api = "pyqt5"  # 环境存在多 Qt 绑定，强制 pytest-qt 使用 PyQt5
 
 [tool.coverage.run]
 branch = true
