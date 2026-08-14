@@ -4,6 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![UI: PyQt5](https://img.shields.io/badge/UI-PyQt5-orange.svg)]()
 [![UI: Streamlit](https://img.shields.io/badge/UI-Streamlit-red.svg)]()
+[![version](https://img.shields.io/badge/version-1.2.6-blueviolet)]()
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF)]()
+[![tests](https://img.shields.io/badge/tests-164%20passed-brightgreen)]()
+[![coverage](https://img.shields.io/badge/coverage-84%25-brightgreen)]()
 
 一站式 **Python 量化交易平台**：覆盖从行情数据、策略研发、向量化回测、风险分析到组合优化的完整量化工作流。
 提供 **PyQt5 原生桌面 GUI** 与 **Streamlit Web UI** 双界面，无需浏览器即可完成全部研究流程。
@@ -155,6 +159,32 @@ PyQuantLab/
 ## 修改日志
 
 详见 [CHANGELOG.md](CHANGELOG.md)。
+
+## 质量与工程化
+
+| 维度 | 状态 |
+|------|------|
+| 测试体系 | **164 用例**三层金字塔：单元 146 + 集成 8 + E2E 冒烟 10（`pytest tests/ -q`） |
+| 覆盖率门禁 | **≥80%**（`pyproject.toml` fail_under=80） |
+| Lint/Format | ruff（0 错误）+ pre-commit 提交前自动检查 |
+| 提交规范 | Conventional Commits（commitizen 强制，commit-msg hook） |
+| CI | GitHub Actions：lint → 测试 → 覆盖率门禁（`.github/workflows/ci.yml`） |
+| API 文档 | [pdoc 在线文档](docs/api/index.html)，`scripts/build_docs.ps1` 一键重建 |
+
+## 打包发布（exe）
+
+桌面版与 ML 训练器为**独立 exe + 共享 DLL 目录**结构，发布时三者缺一不可：
+
+```
+dist/
+├── PyQuantLab/          # 主程序 GUI（双击 PyQuantLab.exe）
+├── PyQuantLab_ML/       # ML/DL 训练器（命令行 ml-trainer）
+└── PyQuantLab_common/   # 共享 mkl 数学库（两 exe 共用，勿删）
+```
+
+- 主程序：`dist\PyQuantLab\PyQuantLab.exe` 双击运行
+- ML 训练器：`dist\PyQuantLab_ML\PyQuantLab_ML.exe train/registry/overfit --help`
+- 重新打包：`python -m PyInstaller PyQuantLab_Qt.spec --noconfirm`（主程序）/ `PyQuantLab_ML.spec`（ML）；共享目录用 `scripts/build_common.ps1`
 
 ## API 文档
 
